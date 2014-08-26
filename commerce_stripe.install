@@ -46,3 +46,14 @@ function commerce_stripe_requirements($phase) {
   }
   return $requirements;
 }
+
+/**
+ * Implements hook_uninstall().
+ */
+function commerce_stripe_uninstall() {
+  // Uninstall rules configuration.
+  $config = rules_config_load('commerce_payment_commerce_stripe');
+  if ($config) {
+    rules_config_delete(array($config->id));
+  }
+}
