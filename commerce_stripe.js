@@ -115,6 +115,22 @@
             return false;
           }
         });
+
+        $('#commerce-stripe-cardonfile-create-form #edit-submit').live('click', function (event) {
+          var cardFields = {
+            number: 'edit-credit-card-number',
+            cvc: 'edit-credit-card-code',
+            exp_month: 'edit-credit-card-exp-month',
+            exp_year: 'edit-credit-card-exp-year',
+            name: 'edit-credit-card-owner'
+          };
+
+          var responseHandler = makeResponseHandler($('#commerce-stripe-cardonfile-create-form'), $('#card-errors'));
+
+          createToken(cardFields, responseHandler);
+
+          return false;
+        });
       }
     }
   }
