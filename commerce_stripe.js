@@ -9,6 +9,59 @@
       if (settings.stripe.fetched == null) {
         settings.stripe.fetched = true;
 
+        var createToken = function (cardFieldMap, responseHandler) {
+          Stripe.setPublishableKey(settings.stripe.publicKey);
+
+          var cardValues = {
+            number: $('[id^=' + cardFieldMap.number +']').val(),
+            cvc: $('[id^=' + cardFieldMap.cvc +']').val(),
+            exp_month: $('[id^=' + cardFieldMap.exp_month +']').val(),
+            exp_year: $('[id^=' + cardFieldMap.exp_year +']').val(),
+            name: $('[id^=' + cardFieldMap.name +']').val()
+          };
+
+          var optionalFieldMap = {
+            address_line1: 'commerce-stripe-thoroughfare',
+            address_line2: 'commerce-stripe-premise',
+            address_city: 'commerce-stripe-locality',
+            address_state: 'commerce-stripe-administrative-area',
+            address_zip: 'commerce-stripe-postal-code',
+            address_country: 'commerce-stripe-country'
+          };
+          for (var stripeName in optionalFieldMap) {
+            if (optionalFieldMap.hasOwnProperty(stripeName)) {
+              var formInputElement = $('.' + optionalFieldMap[stripeName]);
+              if (formInputElement.length) {
+                cardValues[stripeName] = formInputElement.val();
+              }
+            }
+          }
+
+          Stripe.createToken(cardValues, responseHandler);
+        };
+
+        var makeResponseHandler = function (form$, errorDisplay$, onError, onSuccess) {
+          return function (status, response) {
+            if (response.error) {
+              // Show the errors on the form.
+              errorDisplay$.html($("<div class='messages error'></div>").html(response.error.message));
+
+              onError && onError(form$);
+            }
+            else {
+              // Token contains id, last4, and card type.
+              var token = response['id'];
+              // Insert the token into the form so it gets submitted to the server.
+              form$.append("<input type='hidden' name='stripeToken' value='" + token + "'/>");
+
+              onSuccess && onSuccess(form$);
+
+              // And submit.
+              form$.get(0).submit(form$);
+            }
+          };
+        };
+
         $('#edit-continue').live('click', function(event) {
 
           // Prevent the Stripe actions to be triggered if Stripe is not selected.
@@ -31,69 +84,37 @@
             // Disable the submit button to prevent repeated clicks.
             $('.form-submit').attr("disabled", "disabled");
 
-            Stripe.setPublishableKey(settings.stripe.publicKey);
-
-            var cardValues = {
-              number: $('[id^=edit-commerce-payment-payment-details-credit-card-number]').val(),
-              cvc: $('[id^=edit-commerce-payment-payment-details-credit-card-code]').val(),
-              exp_month: $('[id^=edit-commerce-payment-payment-details-credit-card-exp-month]').val(),
-              exp_year: $('[id^=edit-commerce-payment-payment-details-credit-card-exp-year]').val(),
-              name: $('[id^=edit-commerce-payment-payment-details-credit-card-owner]').val()
+            var cardFields = {
+              number: 'edit-commerce-payment-payment-details-credit-card-number',
+              cvc: 'edit-commerce-payment-payment-details-credit-card-code',
+              exp_month: 'edit-commerce-payment-payment-details-credit-card-exp-month',
+              exp_year: 'edit-commerce-payment-payment-details-credit-card-exp-year',
+              name: 'edit-commerce-payment-payment-details-credit-card-owner'
             };
 
-            // Check if the optional address fields are present in
-            // the form and include them in the token if so.
-            var optionalFields = {
-              address_line1: 'edit-customer-profile-billing-commerce-customer-address-und-0-thoroughfare',
-              address_line2: 'edit-customer-profile-billing-commerce-customer-address-und-0-premise',
-              address_ciy: 'edit-customer-profile-billing-commerce-customer-address-und-0-locality',
-              address_state: 'edit-customer-profile-billing-commerce-customer-address-und-0-administrative-area',
-              address_zip: 'edit-customer-profile-billing-commerce-customer-address-und-0-postal-code',
-              address_country: 'edit-customer-profile-billing-commerce-customer-address-und-0-country'
-            };
-
-            for (var stripeName in optionalFields) {
-              if (optionalFields.hasOwnProperty(stripeName)) {
-                var formInputElement = $('[id^=' + optionalFields[stripeName] + ']');
-                if (formInputElement.length) {
-                  cardValues[stripeName] = formInputElement.val();
-                }
+            var responseHandler = makeResponseHandler(
+              $("#edit-continue").parents("form"),
+              $('div.payment-errors'),
+              function () {
+                $(this).removeClass('auth-processing');
+                // Enable the submit button to allow resubmission.
+                $('.form-submit').removeAttr("disabled");
+                // Hide progress animated gif.
+                $('.checkout-processing').hide();
+              },
+              function (form$) {
+                var $btnTrigger = $('.form-submit.auth-processing').eq(0);
+                var trigger$ = $("<input type='hidden' />").attr('name', $btnTrigger.attr('name')).attr('value', $btnTrigger.attr('value'));
+                form$.append(trigger$);
               }
-            }
+            );
 
-            Stripe.createToken(cardValues, Drupal.behaviors.stripe.stripeResponseHandler);
+            createToken(cardFields, responseHandler);
 
             // Prevent the form from submitting with the default action.
             return false;
           }
         });
-      }
-    },
-
-    stripeResponseHandler: function (status, response) {
-      if (response.error) {
-        $(this).removeClass('auth-processing');
-
-        // Show the errors on the form.
-        $("div.payment-errors").html($("<div class='messages error'></div>").html(response.error.message));
-
-        // Enable the submit button to allow resubmission.
-        $('.form-submit').removeAttr("disabled");
-        // Hide progress animated gif.
-        $('.checkout-processing').hide();
-      }
-      else {
-        var form$ = $("#edit-continue").parents("form");
-        // Token contains id, last4, and card type.
-        var token = response['id'];
-        // Insert the token into the form so it gets submitted to the server.
-        form$.append("<input type='hidden' name='stripeToken' value='" + token + "'/>");
-        $btnTrigger = $('.form-submit.auth-processing').eq(0);
-        var trigger$ = $("<input type='hidden' />").attr('name', $btnTrigger.attr('name')).attr('value', $btnTrigger.attr('value'));
-        form$.append(trigger$);
-
-        // And submit.
-        form$.get(0).submit();
       }
     }
   }

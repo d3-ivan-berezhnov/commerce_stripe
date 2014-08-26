@@ -495,3 +495,47 @@ function commerce_stripe_customer_id($uid, $instance_id) {
 
   return !empty($customer_id) ? $customer_id : FALSE;
 }
+
+/**
+ * implements hook_field_widget_WIDGET_TYPE_form_alter
+ *
+ * set unique classes on address input fields to guarantee commerce_stripe.js can find them
+ *
+ * @param $element
+ * @param $form_state
+ * @param $context
+ */
+function commerce_stripe_field_widget_addressfield_standard_form_alter(&$element, &$form_state, $context) {
+  if (!$context['field']['field_name'] == 'commerce_customer_address') {
+      return;
+  }
+  commerce_stripe_set_addressfield_class_names($element);
+}
+
+/**
+ * Sets unique class names on address field form elements so that they can be
+ * picked up by commerce_stripe.js.
+ *
+ * @param $element
+ *   the addressfield form element
+ */
+function commerce_stripe_set_addressfield_class_names(&$element) {
+  if (isset($element['street_block']['thoroughfare'])) {
+    $element['street_block']['thoroughfare']['#attributes']['class'][] = 'commerce-stripe-thoroughfare';
+  }
+  if (isset($element['street_block']['premise'])) {
+    $element['street_block']['premise']['#attributes']['class'][] = 'commerce-stripe-premise';
+  }
+  if (isset($element['locality_block']['locality'])) {
+    $element['locality_block']['locality']['#attributes']['class'][] = 'commerce-stripe-locality';
+  }
+  if (isset($element['locality_block']['administrative_area'])) {
+    $element['locality_block']['administrative_area']['#attributes']['class'][] = 'commerce-stripe-administrative-area';
+  }
+  if (isset($element['locality_block']['postal_code'])) {
+    $element['locality_block']['postal_code']['#attributes']['class'][] = 'commerce-stripe-postal-code';
+  }
+  if (isset($element['country'])) {
+    $element['country']['#attributes']['class'][] = 'commerce-stripe-country';
+  }
+}
