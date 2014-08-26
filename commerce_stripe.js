@@ -62,7 +62,7 @@
           };
         };
 
-        $('#edit-continue').live('click', function(event) {
+        $('body').delegate('#edit-continue', 'click', function(event) {
 
           // Prevent the Stripe actions to be triggered if Stripe is not selected.
           if ($("input[value*='commerce_stripe|']").is(':checked')) {
@@ -93,7 +93,7 @@
             };
 
             var responseHandler = makeResponseHandler(
-              $("#edit-continue").parents("form"),
+              $("#edit-continue").closest("form"),
               $('div.payment-errors'),
               function () {
                 $(this).removeClass('auth-processing');
@@ -116,7 +116,7 @@
           }
         });
 
-        $('#commerce-stripe-cardonfile-create-form #edit-submit').live('click', function (event) {
+        $('#commerce-stripe-cardonfile-create-form').delegate('#edit-submit', 'click', function (event) {
           var cardFields = {
             number: 'edit-credit-card-number',
             cvc: 'edit-credit-card-code',
