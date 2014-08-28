@@ -64,22 +64,22 @@
 
         $('body').delegate('#edit-continue', 'click', function(event) {
 
-            // Prevent the Stripe actions to be triggered if Stripe is not selected.
-            if ($("input[value*='commerce_stripe|']").is(':checked')) {
-                // Do not fetch the token if cardonfile is enabled and the customer has selected an existing card.
-                if ($('.form-item-commerce-payment-payment-details-cardonfile').length) {
-                    // If select list enabled in card on file settings
-                    if ($("select[name='commerce_payment[payment_details][cardonfile]']").length
-                        && $("select[name='commerce_payment[payment_details][cardonfile]'] option:selected").val() != 'new') {
-                        return;
-                    }
+          // Prevent the Stripe actions to be triggered if Stripe is not selected.
+          if ($("input[value*='commerce_stripe|']").is(':checked')) {
+            // Do not fetch the token if cardonfile is enabled and the customer has selected an existing card.
+            if ($('.form-item-commerce-payment-payment-details-cardonfile').length) {
+              // If select list enabled in card on file settings
+              if ($("select[name='commerce_payment[payment_details][cardonfile]']").length
+                  && $("select[name='commerce_payment[payment_details][cardonfile]'] option:selected").val() != 'new') {
+                return;
+              }
 
-                    // If radio buttons are enabled in card on file settings
-                    if ($("input[type='radio'][name='commerce_payment[payment_details][cardonfile]']").length
-                        && $("input[type='radio'][name='commerce_payment[payment_details][cardonfile]']:checked").val() != 'new') {
-                        return;
-                    }
-                }
+              // If radio buttons are enabled in card on file settings
+              if ($("input[type='radio'][name='commerce_payment[payment_details][cardonfile]']").length
+                  && $("input[type='radio'][name='commerce_payment[payment_details][cardonfile]']:checked").val() != 'new') {
+                return;
+              }
+            }
 
             $(this).addClass('auth-processing');
 
@@ -91,7 +91,7 @@
 
             // Disable the submit button to prevent repeated clicks.
             $('.form-submit').attr("disabled", "disabled");
-
+   
             var cardFields = {
               number: 'edit-commerce-payment-payment-details-credit-card-number',
               cvc: 'edit-commerce-payment-payment-details-credit-card-code',
