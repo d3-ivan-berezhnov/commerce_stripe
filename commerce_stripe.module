@@ -154,16 +154,6 @@ function _commerce_stripe_credit_card_form() {
 function commerce_stripe_submit_form($payment_method, $pane_values, $checkout_pane, $order) {
   $form = _commerce_stripe_credit_card_form();
 
-  // Add the total amount.
-  $form['total'] = array(
-    '#type' => 'hidden',
-    '#value' => field_get_items('commerce_order', $order, 'commerce_order_total'),
-    '#attributes' => array(
-      'name' => '',
-      'class' => array('stripe-order-total'),
-    ),
-  );
-
   // Set our key to settings array.
   drupal_add_js(array('stripe' => array('publicKey' => $payment_method['settings']['public_key'])), 'setting');
 
