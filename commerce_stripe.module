@@ -214,12 +214,16 @@ function commerce_stripe_submit_form_submit($payment_method, $pane_form, $pane_v
   // To later store the card with all required fields, carry out necessary steps before making the charge request.
   if (module_exists('commerce_cardonfile') && !empty($payment_method['settings']['cardonfile']) &&
     !empty($pane_values['credit_card']['cardonfile_store']) && $pane_values['credit_card']['cardonfile_store']) {
-    $save_card = TRUE;
     $card = _commerce_stripe_create_card($_POST['stripeToken'], $order->uid, $payment_method);
-    $stripe_card_id = $card->id;
-    $stripe_customer_id = $card->customer;
-    $c['card'] = $stripe_card_id;
-    $c['customer'] = $stripe_customer_id;
+
+    // If the card is not declined or otherwise is error-free, we can save it.
+    if ($card && !empty($card->id)) {
+      $stripe_card_id = $card->id;
+      $stripe_customer_id = $card->customer;
+      $c['card'] = $stripe_card_id;
+      $c['customer'] = $stripe_customer_id;
+      $save_card = TRUE;
+    }
   }
 
   $transaction = commerce_payment_transaction_new('commerce_stripe', $order->order_id);
