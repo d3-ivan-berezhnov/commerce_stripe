@@ -557,6 +557,13 @@ function commerce_stripe_load_library() {
     return FALSE;
   }
   else {
+    $minimum_version = '1.17.1';
+    if (version_compare($library['version'], $minimum_version) < 0 ) {
+      $message = "Commerce Stripe is currently tested with stripe-php library version @minimum_version. You are using version @installed_version, and you should update.";
+      $variables = array('@minimum_version' => $minimum_version, '@installed_version' => $library['version']);
+      watchdog('commerce_stripe', $message, $variables, WATCHDOG_WARNING);
+      return FALSE;
+    }
     return TRUE;
   }
 }
