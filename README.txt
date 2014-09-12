@@ -36,6 +36,7 @@ CONFIGURING PAYMENT METHOD
 CREDITS
 -------
 
-Commerce Stripe integration has been written by Ilari Mäkelä.
+Commerce Stripe integration has been written by:
 
-http://drupal.org/user/726092/
+Ilari Mäkelä - https://drupal.org/user/726092
+Avi Goldberg - https://drupal.org/user/2565920
