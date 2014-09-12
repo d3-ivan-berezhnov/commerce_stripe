@@ -243,7 +243,7 @@ function commerce_stripe_submit_form_submit($payment_method, $pane_form, $pane_v
     drupal_set_message(check_plain($e->getMessage()), 'error');
     watchdog('commerce_stripe', 'Following error received when processing card @stripe_error.', array('@stripe_error' => $e->getMessage()), WATCHDOG_NOTICE);
     $transaction->remote_id = $e->getHttpStatus();
-    $transaction->payload[REQUEST_TIME] = $e->json_body;
+    $transaction->payload[REQUEST_TIME] = $e->jsonBody;
     $transaction->message = t('Card processing error: @stripe_error', array('@stripe_error' => $e->getMessage()));
     $transaction->status = COMMERCE_PAYMENT_STATUS_FAILURE;
     commerce_payment_transaction_save($transaction);
@@ -419,7 +419,7 @@ function commerce_stripe_cardonfile_charge($payment_method, $card_data, $order, 
   catch (Exception $e) {
     watchdog('commerce_stripe', 'Following error received when processing card @stripe_error.', array('@stripe_error' => $e->getMessage()), WATCHDOG_NOTICE);
     $transaction->remote_id = $e->getHttpStatus();
-    $transaction->payload[REQUEST_TIME] = $e->json_body;
+    $transaction->payload[REQUEST_TIME] = $e->jsonBody;
     $transaction->message = t('Card processing error: @stripe_error', array('@stripe_error' => $e->getMessage()));
     $transaction->status = COMMERCE_PAYMENT_STATUS_FAILURE;
     commerce_payment_transaction_save($transaction);
