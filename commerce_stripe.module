@@ -158,7 +158,7 @@ function commerce_stripe_submit_form($payment_method, $pane_values, $checkout_pa
   drupal_add_js(array('stripe' => array('publicKey' => $payment_method['settings']['public_key'])), 'setting');
 
   // Include the stripe.js from stripe.com.
-  drupal_add_js('https://js.stripe.com/v1/', 'external');
+  drupal_add_js('https://js.stripe.com/v2/', 'external');
 
   // Load commerce_stripe.js.
   $form['#attached']['js'] = array(
@@ -439,7 +439,7 @@ function commerce_stripe_cardonfile_create_form($form, &$form_state, $op, $card_
   drupal_add_js(array('stripe' => array('publicKey' => _commerce_stripe_load_setting('public_key'))), 'setting');
 
   // Include the stripe.js from stripe.com.
-  drupal_add_js('https://js.stripe.com/v1/', 'external');
+  drupal_add_js('https://js.stripe.com/v2/', 'external');
 
   // Load commerce_stripe.js.
   $form['#attached']['js'] = array(
