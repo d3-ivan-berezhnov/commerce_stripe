@@ -81,10 +81,14 @@
               }
             }
 
-            $(this).addClass('auth-processing');
-
             // Prevent the form from submitting with the default action.
             event.preventDefault();
+
+            // Prevent duplicate submissions to stripe from multiple clicks
+            if ($(this).hasClass('auth-processing')) {
+              return;
+            }
+            $(this).addClass('auth-processing');
 
             // Show progress animated gif (needed for submitting after first error).
             $('.checkout-processing').show();
