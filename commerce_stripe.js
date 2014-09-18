@@ -44,7 +44,7 @@
           return function (status, response) {
             if (response.error) {
               // Show the errors on the form.
-              errorDisplay$.html($("<div class='messages error'></div>").html(response.error.message));
+              errorDisplay$.html($("<div id='commerce-stripe-validation-errors' class='messages error'></div>").html(response.error.message));
 
               onError && onError(form$);
             }
@@ -93,6 +93,9 @@
             // Show progress animated gif (needed for submitting after first error).
             $('.checkout-processing').show();
 
+            // Remove error reports from the last submission
+            $('#commerce-stripe-validation-errors').remove();
+
             // Disable the submit button to prevent repeated clicks.
             $('.form-submit').attr("disabled", "disabled");
    
@@ -107,10 +110,11 @@
             var responseHandler = makeResponseHandler(
               $("#edit-continue").closest("form"),
               $('div.payment-errors'),
-              function () {
-                $(this).removeClass('auth-processing');
+              function (form$) {
+                submitButtons$ = form$.find('.checkout-continue');
+                submitButtons$.removeClass('auth-processing');
                 // Enable the submit button to allow resubmission.
-                $('.form-submit').removeAttr("disabled");
+                submitButtons$.removeAttr('disabled');
                 // Hide progress animated gif.
                 $('.checkout-processing').hide();
               },
