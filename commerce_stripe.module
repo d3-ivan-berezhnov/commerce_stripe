@@ -252,19 +252,6 @@ function commerce_stripe_submit_form_submit($payment_method, $pane_form, $pane_v
 
   // If so instructed by the customer, save the card.
   if (!empty($save_card)) {
-
-/**
-    // Try fetching the name to store with the card from the billing pane.
-    $order_wrapper = entity_metadata_wrapper('commerce_order', $order);
-    if ($order_wrapper->commerce_customer_billing->value()) {
-      $billing_address = $order_wrapper->commerce_customer_billing->commerce_customer_address->value();
-     }
-    else {
-      $billing_address = array();
-    }
- *
- */
-
     _commerce_stripe_save_cardonfile($response->card, $order->uid, $payment_method, $pane_values['cardonfile_instance_default']);
   }
 }
