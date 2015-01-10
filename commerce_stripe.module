@@ -214,9 +214,14 @@ function commerce_stripe_submit_form_submit($payment_method, $pane_form, $pane_v
 
   // Begin assembling charge parameters.
   Stripe::setApiKey($payment_method['settings']['secret_key']);
+
+  $currency_code = $payment_method['settings']['stripe_currency'];
+  if(isset($charge['currency_code'])){
+    $currency_code = $charge['currency_code'];
+  }
   $c = array(
     'amount' => $charge['amount'],
-    'currency' => $payment_method['settings']['stripe_currency'],
+    'currency' => $currency_code,
     'card' => $_POST['stripeToken'],
     'description' => t('Order Number: @order_number', array('@order_number' => $order->order_number)),
   );
@@ -235,7 +240,7 @@ function commerce_stripe_submit_form_submit($payment_method, $pane_form, $pane_v
   $transaction = commerce_payment_transaction_new('commerce_stripe', $order->order_id);
   $transaction->instance_id = $payment_method['instance_id'];
   $transaction->amount = $charge['amount'];
-  $transaction->currency_code = $charge['currency_code'];
+  $transaction->currency_code = $currency_code;
   try {
     $response = Stripe_Charge::create($c);
     $transaction->remote_id = $response->id;
@@ -370,7 +375,7 @@ function _commerce_stripe_load_settings($name = NULL) {
   if (commerce_payment_method_load('commerce_stripe') && rules_config_load('commerce_payment_commerce_stripe')) {
     $commerce_stripe_payment_method = commerce_payment_method_instance_load('commerce_stripe|commerce_payment_commerce_stripe');
   }
-  
+
   if (isset($name) && rules_config_load('commerce_payment_commerce_stripe')) {
     $commerce_stripe_payment_method = commerce_payment_method_instance_load('commerce_stripe|commerce_payment_commerce_stripe');
   }
@@ -398,11 +403,16 @@ function commerce_stripe_cardonfile_charge($payment_method, $card_data, $order, 
   // Fetch the customer id and card id from $card_data->remote_id
   list($customer_id, $card_id) = explode('|', $card_data->remote_id);
 
+  $currency_code = $payment_method['settings']['stripe_currency'];
+  if(isset($charge['currency_code'])){
+    $currency_code = $charge['currency_code'];
+  }
+
   // Assemble charge parameters.
   Stripe::setApiKey($payment_method['settings']['secret_key']);
   $c = array(
     'amount' => $charge['amount'],
-    'currency' => $payment_method['settings']['stripe_currency'],
+    'currency' => $currency_code,
     'customer' => $customer_id,
     'card' => $card_id,
     'description' => t('Order Number: @order_number', array('@order_number' => $order->order_number)),
@@ -411,7 +421,7 @@ function commerce_stripe_cardonfile_charge($payment_method, $card_data, $order, 
   $transaction = commerce_payment_transaction_new('commerce_stripe', $order->order_id);
   $transaction->instance_id = $payment_method['instance_id'];
   $transaction->amount = $charge['amount'];
-  $transaction->currency_code = $charge['currency_code'];
+  $transaction->currency_code = $currency_code;
 
   try {
     $response = Stripe_Charge::create($c);
