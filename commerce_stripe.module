@@ -236,12 +236,20 @@ function commerce_stripe_submit_form_submit($payment_method, $pane_form, $pane_v
   $transaction->amount = $charge['amount'];
   $transaction->currency_code = $currency_code;
   try {
-    $response = Stripe_Charge::create($c);
-    $transaction->remote_id = $response->id;
-    $transaction->payload[REQUEST_TIME] = $response->__toJSON();
-    $transaction->message = t('Payment completed successfully.');
-    $transaction->status = COMMERCE_PAYMENT_STATUS_SUCCESS;
-    commerce_payment_transaction_save($transaction);
+    // Stripe does not appreciate $0 transfers.
+    if ($charge['amount'] > 0) {
+      $response = Stripe_Charge::create($c);
+      $transaction->remote_id = $response->id;
+      $transaction->payload[REQUEST_TIME] = $response->__toJSON();
+      $transaction->message = t('Payment completed successfully.');
+      $transaction->status = COMMERCE_PAYMENT_STATUS_SUCCESS;
+      commerce_payment_transaction_save($transaction);
+      $card_repsonse = $response->card;
+    }
+    // If the total is $0 we just put the card on file.
+    else {
+      $card_response = $card;
+    }
   }
   catch (Exception $e) {
     drupal_set_message(t('We received the following error processing your card. Please enter your information again or try a different card.'), 'error');
@@ -257,7 +265,7 @@ function commerce_stripe_submit_form_submit($payment_method, $pane_form, $pane_v
 
   // If so instructed by the customer, save the card.
   if (!empty($save_card)) {
-    _commerce_stripe_save_cardonfile($response->card, $order->uid, $payment_method, $pane_values['cardonfile_instance_default']);
+    _commerce_stripe_save_cardonfile($card_response, $order->uid, $payment_method, $pane_values['cardonfile_instance_default']);
   }
 }
 
@@ -407,7 +415,7 @@ function commerce_stripe_cardonfile_charge($payment_method, $card_data, $order, 
 
   try {
     $lock = __FUNCTION__ .'_'. $order->order_id;
-    if (lock_acquire($lock)) {
+    if (lock_acquire($lock) && ($charge['amount'] > 0)) {
       $response = Stripe_Charge::create($c);
       $transaction->remote_id = $response->id;
       $transaction->payload[REQUEST_TIME] = $response->__toJSON();
