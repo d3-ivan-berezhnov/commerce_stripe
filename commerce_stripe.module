@@ -474,8 +474,12 @@ function commerce_stripe_cardonfile_create_form($form, &$form_state, $op, $card_
   if (isset($form_state['input']['country'])) {
     $available_countries = array($form_state['input']['country'] => NULL);
   }
+
+  $field = field_info_field('commerce_customer_address');
+  $instance = field_info_instance('commerce_customer_profile', 'commerce_customer_address', 'billing');
+
   $form['address'] = addressfield_generate(
-    addressfield_default_values($available_countries),
+    addressfield_default_values($field, $instance, array($available_countries)),
     array('address' => 'address'),
     array('mode' => 'form'));
 
