@@ -349,6 +349,7 @@ function _commerce_stripe_save_cardonfile($card, $uid, $payment_method, $set_def
   $card_data->card_exp_month = $card->exp_month;
   $card_data->card_exp_year = $card->exp_year;
   $card_data->status = 1;
+  $card_data->instance_default = 0;
   commerce_cardonfile_save($card_data);
 
   if ($set_default) {
