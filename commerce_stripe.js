@@ -30,9 +30,14 @@
           };
           for (var stripeName in optionalFieldMap) {
             if (optionalFieldMap.hasOwnProperty(stripeName)) {
-              var formInputElement = $('.' + optionalFieldMap[stripeName]);
+              var formInputElement = $('.' + optionalFieldMap[stripeName], context);
               if (formInputElement.length) {
                 cardValues[stripeName] = formInputElement.val();
+              }
+              else {
+                // Load the values from settings if the billing address isn't on
+                // the same checkout pane as the address form.
+                cardValues[stripeName] = Drupal.settings.commerce_stripe_address[stripeName];
               }
             }
           }
@@ -98,7 +103,7 @@
 
             // Disable the submit button to prevent repeated clicks.
             $('.form-submit').attr("disabled", "disabled");
-   
+
             var cardFields = {
               number: 'edit-commerce-payment-payment-details-credit-card-number',
               cvc: 'edit-commerce-payment-payment-details-credit-card-code',

@@ -152,6 +152,28 @@ function _commerce_stripe_credit_card_form() {
  * Payment method callback: checkout form.
  */
 function commerce_stripe_submit_form($payment_method, $pane_values, $checkout_pane, $order) {
+  $order_wrapper = entity_metadata_wrapper('commerce_order', $order);
+
+  // Attempt to load the billing address from the order data.
+  $billing_address = addressfield_default_values();
+  if (!empty($order->commerce_customer_billing)) {
+    if (!empty($order_wrapper->commerce_customer_billing->commerce_customer_address)) {
+      $billing_address = $order_wrapper->commerce_customer_billing->commerce_customer_address->value();
+    }
+  }
+
+  // Pass the billing address values to javacript so they can be included in
+  // the token request to Stripe.
+  $address = array(
+    'address_line1' => !empty($billing_address['thoroughfare']) ? $billing_address['thoroughfare'] : '',
+    'address_line2' => !empty($billing_address['premise']) ? $billing_address['premise'] : '',
+    'address_city' => !empty($billing_address['locality']) ? $billing_address['locality'] : '',
+    'address_state' => !empty($billing_address['administrative_area']) ? $billing_address['administrative_area'] : '',
+    'address_zip' => !empty($billing_address['postal_code']) ? $billing_address['postal_code'] : '',
+    'address_country' => !empty($billing_address['country']) ? $billing_address['country'] : '',
+  );
+  drupal_add_js(array('commerce_stripe_address' => $address), array('type' => 'setting'));
+
   $form = _commerce_stripe_credit_card_form();
 
   // Set our key to settings array.
