@@ -153,9 +153,16 @@ function _commerce_stripe_credit_card_form() {
  */
 function commerce_stripe_submit_form($payment_method, $pane_values, $checkout_pane, $order) {
   $order_wrapper = entity_metadata_wrapper('commerce_order', $order);
+  $field = field_info_field('commerce_customer_address');
+  $instance = field_info_instance('commerce_customer_profile', 'commerce_customer_address', 'billing');
+  
+  $available_countries = NULL;
+  if (isset($form_state['input']['country'])) {
+    $available_countries = array($form_state['input']['country'] => NULL);
+  }
 
   // Attempt to load the billing address from the order data.
-  $billing_address = addressfield_default_values();
+  $billing_address = addressfield_default_values($field, $instance, array($available_countries));
   if (!empty($order->commerce_customer_billing)) {
     if (!empty($order_wrapper->commerce_customer_billing->commerce_customer_address)) {
       $billing_address = $order_wrapper->commerce_customer_billing->commerce_customer_address->value();
