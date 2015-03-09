@@ -91,7 +91,7 @@
 
             // Prevent duplicate submissions to stripe from multiple clicks
             if ($(this).hasClass('auth-processing')) {
-              return;
+              return false;
             }
             $(this).addClass('auth-processing');
 
