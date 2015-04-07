@@ -40,7 +40,9 @@ function commerce_stripe_commerce_payment_method_info() {
   $payment_methods = array();
 
   $payment_methods['commerce_stripe'] = array(
-    'title' => _commerce_stripe_load_setting('display_title', t('Stripe')),
+    'title' => t('Stripe'),
+    'short_title' => t('Stripe'),
+    'display_title' => t('Credit card'),
     'description' => t('Stripe payment gateway'),
     'active' => FALSE,
     'terminal' => FALSE,
