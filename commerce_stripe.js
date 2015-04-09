@@ -34,7 +34,7 @@
               if (formInputElement.length) {
                 cardValues[stripeName] = formInputElement.val();
               }
-              else {
+              else if (typeof Drupal.settings.commerce_stripe_address != 'undefined') {
                 // Load the values from settings if the billing address isn't on
                 // the same checkout pane as the address form.
                 cardValues[stripeName] = Drupal.settings.commerce_stripe_address[stripeName];
