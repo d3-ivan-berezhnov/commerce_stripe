@@ -23,6 +23,10 @@ function drush_commerce_stripe_download() {
   if (module_exists('libraries')) {
     $path .= '/' . libraries_get_path('stripe-php');
   }
+  else {
+    drush_log(dt('Commerce Stripe requires the Libraries module (https://www.drupal.org/project/libraries) in order to install the Stripe PHP library.'), 'warning');
+    return;
+  }
 
   if (is_dir($path)) {
     drush_log('Stripe PHP library already present. No download required.', 'ok');
