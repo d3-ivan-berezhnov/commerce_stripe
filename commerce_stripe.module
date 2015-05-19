@@ -9,6 +9,7 @@
 
 define('STRIPE_PUBLIC_KEY', '');
 define('STRIPE_SECRET_KEY', '');
+define('STRIPE_DEFAULT_INEGRATION', 'stripejs');
 
 /**
  * Implements hook_libraries_info().
@@ -104,6 +105,28 @@ function commerce_stripe_settings_form($settings) {
     '#description' => t('Payment method display title'),
     '#default_value' => !empty($settings['display_title']) ? $settings['display_title'] : t('Stripe'),
   );
+  $form['integration_type'] = array(
+    '#type' => 'select',
+    '#title' => t('Integration type'),
+    '#description' => t('Choose Stripe integration method: Stripe.js makes it easy to collect credit card (and other similarly sensitive) details without having the information touch your server.  Checkout is an embeddable iframe for desktop, tablet, and mobile devices.'),
+    '#options' => array('stripejs' => t('stripe.js'), 'checkout' => t('checkout')),
+    '#default_value' => !empty($settings['integration_type']) ? $settings['integration_type'] : STRIPE_DEFAULT_INEGRATION,
+  );
+  $form['checkout_settings'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('These settings are specific to "checkout" integration type.'),
+    '#states' => array(
+      'visible' => array(
+        ':input[name="integration_type"]' => array('value' => 'checkout'),
+      ),
+    ),
+  );
+  $form['checkout_settings']['verify_zipcode'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('ZIP code verification'),
+    '#description' => t('Specify whether Checkout should validate the billing ZIP code'),
+    '#default_value' => isset($settings['checkout_settings']['verify_zipcode']) ? $settings['checkout_settings']['verify_zipcode'] : 0,
+  );
   if (module_exists('commerce_cardonfile')) {
     $form['cardonfile'] = array(
       '#type' => 'checkbox',
@@ -154,10 +177,12 @@ function _commerce_stripe_credit_card_form() {
  * Payment method callback: checkout form.
  */
 function commerce_stripe_submit_form($payment_method, $pane_values, $checkout_pane, $order) {
+  global $user;
+  $integration_type = !empty($payment_method['settings']['integration_type']) ? $payment_method['settings']['integration_type'] : STRIPE_DEFAULT_INEGRATION;
   $order_wrapper = entity_metadata_wrapper('commerce_order', $order);
   $field = field_info_field('commerce_customer_address');
   $instance = field_info_instance('commerce_customer_profile', 'commerce_customer_address', 'billing');
-  
+
   $available_countries = NULL;
   if (isset($form_state['input']['country'])) {
     $available_countries = array($form_state['input']['country'] => NULL);
@@ -183,13 +208,47 @@ function commerce_stripe_submit_form($payment_method, $pane_values, $checkout_pa
   );
   drupal_add_js(array('commerce_stripe_address' => $address), array('type' => 'setting'));
 
-  $form = _commerce_stripe_credit_card_form();
+  // Differentiate form elements based on stripe integrartion type.
+  if ($integration_type == 'stripejs') {
+    $form = _commerce_stripe_credit_card_form();
+
+    // Include the stripe.js from stripe.com.
+    drupal_add_js('https://js.stripe.com/v2/', 'external');
+  }
+  elseif ($integration_type == 'checkout') {
+    $form = array();
+    // Add pay button.
+    $verify_zipcode = !empty($payment_method['settings']['checkout_settings']['verify_zipcode']) ? $payment_method['settings']['checkout_settings']['verify_zipcode'] : 0;
+    // Add Stripe checkout embedding settings.
+    drupal_add_js(array('stripe' => array(
+      'currency' => $payment_method['settings']['stripe_currency'],
+      'name' => variable_get('site_name', ''),
+      'verify_zipcode' => ($verify_zipcode) ? TRUE : FALSE,
+      'client_email' => $user->mail,
+    )), 'setting');
+    // Add external checkout.js library.
+    drupal_add_js('https://checkout.stripe.com/checkout.js', 'external');
+  }
+
+  // Add stripe token field. This field is a container for token received from
+  // Stripe API.
+  $form['stripe_token'] = array(
+    '#type' => 'hidden',
+    '#attributes' => array('id' => 'stripe_token'),
+    '#default_value' => !empty($pane_values['stripe_token']) ? $pane_values['stripe_token'] : '',
+  );
+
 
   // Set our key to settings array.
-  drupal_add_js(array('stripe' => array('publicKey' => $payment_method['settings']['public_key'])), 'setting');
-
-  // Include the stripe.js from stripe.com.
-  drupal_add_js('https://js.stripe.com/v2/', 'external');
+  drupal_add_js(
+    array(
+      'stripe' => array(
+        'publicKey' => $payment_method['settings']['public_key'],
+        'integration_type' => $integration_type,
+      ),
+    ),
+    'setting'
+  );
 
   // Load commerce_stripe.js.
   $form['#attached']['js'] = array(
@@ -243,14 +302,13 @@ function commerce_stripe_submit_form_submit($payment_method, $pane_form, $pane_v
   $c = array(
     'amount' => $charge['amount'],
     'currency' => $currency_code,
-    'card' => $_POST['stripeToken'],
+    'card' => $pane_values['stripe_token'],
     'description' => t('Order Number: @order_number', array('@order_number' => $order->order_number)),
   );
-
   // To later store the card with all required fields, carry out necessary steps before making the charge request.
   if (module_exists('commerce_cardonfile') && !empty($payment_method['settings']['cardonfile']) &&
     !empty($pane_values['credit_card']['cardonfile_store']) && $pane_values['credit_card']['cardonfile_store']) {
-    $card = _commerce_stripe_create_card($_POST['stripeToken'], $order->uid, $payment_method);
+    $card = _commerce_stripe_create_card($pane_values['stripe_token'], $order->uid, $payment_method);
 
     // If the card is not declined or otherwise is error-free, we can save it.
     if ($card && !empty($card->id)) {
@@ -536,7 +594,7 @@ function commerce_stripe_cardonfile_create_form_submit($form, &$form_state) {
  * Card on file callback: create
  */
 function commerce_stripe_cardonfile_create($form, &$form_state, $payment_method, $card_data) {
-  $card = _commerce_stripe_create_card($_POST['stripeToken'], $card_data->uid, $payment_method);
+  $card = _commerce_stripe_create_card($form_state['values']['stripe_token'], $card_data->uid, $payment_method);
   if (!$card) {
     return;
   }

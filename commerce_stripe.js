@@ -57,7 +57,7 @@
               // Token contains id, last4, and card type.
               var token = response['id'];
               // Insert the token into the form so it gets submitted to the server.
-              form$.append("<input type='hidden' name='stripeToken' value='" + token + "'/>");
+              $('#stripe_token').val(token);
 
               onSuccess && onSuccess(form$);
 
@@ -87,7 +87,15 @@
             }
 
             // Prevent the form from submitting with the default action.
-            event.preventDefault();
+            if ($('#stripe_token').length && $('#stripe_token').val().length === 0) {
+              event.preventDefault();
+              $('.form-submit').attr("disabled", "disabled");
+            }
+            else {
+              return;
+            }
+
+
 
             // Prevent duplicate submissions to stripe from multiple clicks
             if ($(this).hasClass('auth-processing')) {
@@ -98,39 +106,71 @@
             // Show progress animated gif (needed for submitting after first error).
             $('.checkout-processing').show();
 
-            // Remove error reports from the last submission
-            $('#commerce-stripe-validation-errors').remove();
-
             // Disable the submit button to prevent repeated clicks.
             $('.form-submit').attr("disabled", "disabled");
 
-            var cardFields = {
-              number: 'edit-commerce-payment-payment-details-credit-card-number',
-              cvc: 'edit-commerce-payment-payment-details-credit-card-code',
-              exp_month: 'edit-commerce-payment-payment-details-credit-card-exp-month',
-              exp_year: 'edit-commerce-payment-payment-details-credit-card-exp-year',
-              name: 'edit-commerce-payment-payment-details-credit-card-owner'
-            };
+            var form$ = $("#edit-continue").closest("form");
+            var submitButtons$ = form$.find('.checkout-continue');
 
-            var responseHandler = makeResponseHandler(
-              $("#edit-continue").closest("form"),
-              $('div.payment-errors'),
-              function (form$) {
-                submitButtons$ = form$.find('.checkout-continue');
-                submitButtons$.removeClass('auth-processing');
-                // Enable the submit button to allow resubmission.
-                submitButtons$.removeAttr('disabled');
-                // Hide progress animated gif.
-                $('.checkout-processing').hide();
-              },
-              function (form$) {
-                var $btnTrigger = $('.form-submit.auth-processing').eq(0);
-                var trigger$ = $("<input type='hidden' />").attr('name', $btnTrigger.attr('name')).attr('value', $btnTrigger.attr('value'));
-                form$.append(trigger$);
-              }
-            );
+            if (settings.stripe.integration_type == 'stripejs') {
+              // Remove error reports from the last submission
+              $('#commerce-stripe-validation-errors').remove();
 
-            createToken(cardFields, responseHandler);
+              var cardFields = {
+                number: 'edit-commerce-payment-payment-details-credit-card-number',
+                cvc: 'edit-commerce-payment-payment-details-credit-card-code',
+                exp_month: 'edit-commerce-payment-payment-details-credit-card-exp-month',
+                exp_year: 'edit-commerce-payment-payment-details-credit-card-exp-year',
+                name: 'edit-commerce-payment-payment-details-credit-card-owner'
+              };
+
+              var responseHandler = makeResponseHandler(
+                $("#edit-continue").closest("form"),
+                $('div.payment-errors'),
+                function (form$) {
+                  submitButtons$.removeClass('auth-processing');
+                  // Enable the submit button to allow resubmission.
+                  submitButtons$.removeAttr('disabled');
+                  // Hide progress animated gif.
+                  $('.checkout-processing').hide();
+                },
+                function (form$) {
+                  var $btnTrigger = $('.form-submit.auth-processing').eq(0);
+                  var trigger$ = $("<input type='hidden' />").attr('name', $btnTrigger.attr('name')).attr('value', $btnTrigger.attr('value'));
+                  form$.append(trigger$);
+                }
+              );
+
+              createToken(cardFields, responseHandler);
+	          }
+            else if (settings.stripe.integration_type == 'checkout') {
+              var handler = StripeCheckout.configure({
+                key: settings.stripe.publicKey,
+                token: function(token) {
+                  $('#stripe_token').val(token.id);
+                  // And submit.
+                  form$.get(0).submit(form$);
+                },
+                closed: function() {
+                  submitButtons$.removeClass('auth-processing');
+                  $('.checkout-processing').hide();
+                  submitButtons$.removeAttr("disabled");
+                }
+              });
+
+              handler.open({
+                email: settings.stripe.client_email,
+                zipCode: settings.stripe.verify_zipcode,
+                name: settings.stripe.name,
+                currency: settings.stripe.currency,
+                panelLabel: Drupal.t('Checkout'),
+              });
+
+              // Close Checkout on page navigation
+              $(window).bind('popstate', function() {
+                handler.close();
+              });
+            }
 
             // Prevent the form from submitting with the default action.
             return false;
