@@ -163,7 +163,7 @@
                 zipCode: settings.stripe.verify_zipcode,
                 name: settings.stripe.name,
                 currency: settings.stripe.currency,
-                panelLabel: Drupal.t('Checkout'),
+                panelLabel: settings.stripe.panel_label,
               });
 
               // Close Checkout on page navigation
