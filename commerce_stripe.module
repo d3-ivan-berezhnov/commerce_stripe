@@ -121,6 +121,12 @@ function commerce_stripe_settings_form($settings) {
       ),
     ),
   );
+  $form['checkout_settings']['panel_label'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Payment button label'),
+    '#description' => t('The label of the payment button in the Checkout form'),
+    '#default_value' => isset($settings['checkout_settings']['panel_label']) ? $settings['checkout_settings']['panel_label'] : 'Checkout',
+  );
   $form['checkout_settings']['verify_zipcode'] = array(
     '#type' => 'checkbox',
     '#title' => t('ZIP code verification'),
@@ -226,12 +232,13 @@ function commerce_stripe_submit_form($payment_method, $pane_values, $checkout_pa
     $form = array();
     // Add pay button.
     $verify_zipcode = !empty($payment_method['settings']['checkout_settings']['verify_zipcode']) ? $payment_method['settings']['checkout_settings']['verify_zipcode'] : 0;
-
+    $panel_label = !empty($payment_method['settings']['checkout_settings']['panel_label']) ? $payment_method['settings']['checkout_settings']['panel_label'] : 'Checkout';
     $order_wrapper = entity_metadata_wrapper('commerce_order', $order);
     $order_total = $order_wrapper->commerce_order_total->value();
 
     // Add Stripe checkout embedding settings.
     drupal_add_js(array('stripe' => array(
+      'panel_label' => t($panel_label),
       'currency' => $payment_method['settings']['stripe_currency'],
       'name' => variable_get('site_name', ''),
       'verify_zipcode' => ($verify_zipcode) ? TRUE : FALSE,
