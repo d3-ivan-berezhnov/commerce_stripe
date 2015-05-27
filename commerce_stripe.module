@@ -127,6 +127,13 @@ function commerce_stripe_settings_form($settings) {
     '#description' => t('Specify whether Checkout should validate the billing ZIP code'),
     '#default_value' => isset($settings['checkout_settings']['verify_zipcode']) ? $settings['checkout_settings']['verify_zipcode'] : 0,
   );
+  $form['checkout_settings']['bitcoin'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Accept Bitcoin'),
+    '#description' => t('When checked, Stripe Checkout will accept Bitcoin as payment.').
+      l(t('Must be enabled in your Stripe account.'), 'https://dashboard.stripe.com/account/bitcoin/enable'),
+    '#default_value' => isset($settings['checkout_settings']['bitcoin']) ? $settings['checkout_settings']['bitcoin'] : 0,
+  );
   if (module_exists('commerce_cardonfile')) {
     $form['cardonfile'] = array(
       '#type' => 'checkbox',
@@ -208,7 +215,7 @@ function commerce_stripe_submit_form($payment_method, $pane_values, $checkout_pa
   );
   drupal_add_js(array('commerce_stripe_address' => $address), array('type' => 'setting'));
 
-  // Differentiate form elements based on stripe integrartion type.
+  // Differentiate form elements based on stripe integration type.
   if ($integration_type == 'stripejs') {
     $form = _commerce_stripe_credit_card_form();
 
@@ -219,13 +226,20 @@ function commerce_stripe_submit_form($payment_method, $pane_values, $checkout_pa
     $form = array();
     // Add pay button.
     $verify_zipcode = !empty($payment_method['settings']['checkout_settings']['verify_zipcode']) ? $payment_method['settings']['checkout_settings']['verify_zipcode'] : 0;
+
+    $order_wrapper = entity_metadata_wrapper('commerce_order', $order);
+    $order_total = $order_wrapper->commerce_order_total->value();
+
     // Add Stripe checkout embedding settings.
     drupal_add_js(array('stripe' => array(
       'currency' => $payment_method['settings']['stripe_currency'],
       'name' => variable_get('site_name', ''),
       'verify_zipcode' => ($verify_zipcode) ? TRUE : FALSE,
       'client_email' => $user->mail,
+      'bitcoin' => !empty($payment_method['settings']['checkout_settings']['bitcoin']) ? 'true' : 'false',
+      'amount' => $order_total['amount'],
     )), 'setting');
+
     // Add external checkout.js library.
     drupal_add_js('https://checkout.stripe.com/checkout.js', 'external');
   }
@@ -734,7 +748,7 @@ function commerce_stripe_customer_id($uid, $instance_id) {
  */
 function commerce_stripe_field_widget_addressfield_standard_form_alter(&$element, &$form_state, $context) {
   if (!$context['field']['field_name'] == 'commerce_customer_address') {
-      return;
+    return;
   }
   commerce_stripe_set_addressfield_class_names($element);
 }

@@ -163,6 +163,8 @@
                 zipCode: settings.stripe.verify_zipcode,
                 name: settings.stripe.name,
                 currency: settings.stripe.currency,
+                bitcoin: settings.stripe.bitcoin,
+                amount: settings.stripe.amount,
                 panelLabel: Drupal.t('Checkout'),
               });
 
