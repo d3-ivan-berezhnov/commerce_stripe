@@ -242,7 +242,7 @@ function commerce_stripe_submit_form($payment_method, $pane_values, $checkout_pa
       'currency' => $payment_method['settings']['stripe_currency'],
       'name' => variable_get('site_name', ''),
       'verify_zipcode' => ($verify_zipcode) ? TRUE : FALSE,
-      'client_email' => $user->mail,
+      'client_email' => $order->mail,
       'bitcoin' => !empty($payment_method['settings']['checkout_settings']['bitcoin']) ? 'true' : 'false',
       'amount' => $order_total['amount'],
     )), 'setting');
