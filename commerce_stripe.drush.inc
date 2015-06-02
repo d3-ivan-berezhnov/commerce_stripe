@@ -18,20 +18,21 @@ function commerce_stripe_drush_command() {
 /**
  * A command callback.
  */
-function drush_commerce_stripe_download() {
-  $path = drush_get_context('DRUSH_DRUPAL_ROOT');
-  if (module_exists('libraries')) {
-    $path .= '/' . libraries_get_path('stripe-php');
-  }
-  else {
+function drush_commerce_stripe_stripe_download() {
+
+  if (!module_exists('libraries')) { {
     drush_log(dt('Commerce Stripe requires the Libraries module (https://www.drupal.org/project/libraries) in order to install the Stripe PHP library.'), 'warning');
     return;
   }
 
-  if (is_dir($path)) {
-    drush_log('Stripe PHP library already present. No download required.', 'ok');
+  $args = func_get_args();
+  if ($args[0]) {
+    $path = $args[0];
   }
-  elseif (drush_shell_exec('git clone git://github.com/stripe/stripe-php.git ' . $path)) {
+  else {
+    $path = drush_get_context('DRUSH_DRUPAL_ROOT') . '/sites/all/libraries/stripe-php';
+  }
+  if (drush_shell_exec('git clone git://github.com/stripe/stripe-php.git ' . $path)) {
     drush_log(dt('Stripe PHP library has been cloned via git to @path.', array('@path' => $path)), 'success');
   }
   else {
