@@ -10,6 +10,7 @@
  */
 function commerce_stripe_drush_command() {
   $items['stripe-download'] = array(
+    'callback' => 'drush_commerce_stripe_stripe_download',
     'description' => dt('Downloads the Stripe PHP library from https://github.com/stripe/stripe-php.'),
   );
   return $items;
