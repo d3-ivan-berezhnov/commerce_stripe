@@ -164,6 +164,7 @@
                 name: settings.stripe.name,
                 currency: settings.stripe.currency,
                 panelLabel: settings.stripe.panel_label,
+                allowRememberMe: settings.stripe.allow_remember_me,
                 bitcoin: settings.stripe.bitcoin,
                 amount: settings.stripe.amount,
               });

@@ -178,6 +178,12 @@ function commerce_stripe_settings_form($settings) {
     '#description' => t('Specify whether Checkout should validate the billing ZIP code'),
     '#default_value' => isset($settings['checkout_settings']['verify_zipcode']) ? $settings['checkout_settings']['verify_zipcode'] : 0,
   );
+  $form['checkout_settings']['allow_remember_me'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Show "Remember Me" option'),
+    '#description' => t('Specify whether Checkout should allow the user to store their credit card for faster checkout.'),
+    '#default_value' => isset($settings['checkout_settings']['allow_remember_me']) ? $settings['checkout_settings']['allow_remember_me'] : 0,
+  );
   $form['checkout_settings']['bitcoin'] = array(
     '#type' => 'checkbox',
     '#title' => t('Accept Bitcoin'),
@@ -288,6 +294,7 @@ function commerce_stripe_submit_form($payment_method, $pane_values, $checkout_pa
       'name' => variable_get('site_name', ''),
       'verify_zipcode' => ($verify_zipcode) ? TRUE : FALSE,
       'client_email' => $order->mail,
+      'allow_remember_me' => !empty($payment_method['settings']['checkout_settings']['allow_remember_me']) ? 'true' : 'false',
       'bitcoin' => !empty($payment_method['settings']['checkout_settings']['bitcoin']) ? 'true' : 'false',
       'amount' => $order_total['amount'],
     )), 'setting');
