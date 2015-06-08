@@ -160,7 +160,7 @@ function commerce_stripe_settings_form($settings) {
     '#title' => t('These settings are specific to "checkout" integration type.'),
     '#states' => array(
       'visible' => array(
-        ':input[name="integration_type"]' => array('value' => 'checkout'),
+        ':input[name$="[integration_type]"]' => array('value' => 'checkout'),
       ),
     ),
   );
