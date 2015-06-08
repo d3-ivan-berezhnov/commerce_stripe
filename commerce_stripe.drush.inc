@@ -41,18 +41,3 @@ function drush_commerce_stripe_stripe_download() {
     drush_log(dt('Drush was unable to clone Stripe PHP library to @path.', array('@path' => $path)), 'warning');
   }
 }
-
-/**
- * Implements drush_MODULE_post_COMMAND().
- */
-function drush_commerce_stripe_post_pm_enable() {
-  $extensions = func_get_args();
-  // Deal with comma delimited extension list.
-  if (strpos($extensions[0], ',') !== FALSE) {
-    $extensions = explode(',', $extensions[0]);
-  }
-
-  if (in_array('commerce_stripe', $extensions) && !drush_get_option('skip')) {
-    drush_commerce_stripe_download();
-  }
-}
