@@ -634,6 +634,14 @@ function commerce_stripe_cardonfile_create_form($form, &$form_state, $op, $card_
   $form_state['card_data'] = $card_data;
   $form_state['op'] = $op;
 
+  // Add stripe token field. This field is a container for token received from
+  // Stripe API.
+  $form['stripe_token'] = array(
+    '#type' => 'hidden',
+    '#attributes' => array('id' => 'stripe_token'),
+    '#default_value' => !empty($pane_values['stripe_token']) ? $pane_values['stripe_token'] : '',
+  );
+
   // Set our key to settings array.
   drupal_add_js(array('stripe' => array('publicKey' => _commerce_stripe_load_setting('public_key'))), 'setting');
 
