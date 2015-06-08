@@ -7,9 +7,7 @@
  * straight from you Commerce shop.
  */
 
-define('STRIPE_PUBLIC_KEY', '');
-define('STRIPE_SECRET_KEY', '');
-define('STRIPE_DEFAULT_INEGRATION', 'stripejs');
+define('STRIPE_DEFAULT_INTEGRATION', 'stripejs');
 
 /**
  * Implements hook_menu().
@@ -134,14 +132,14 @@ function commerce_stripe_settings_form($settings) {
     '#type' => 'textfield',
     '#title' => t('Secret Key'),
     '#description' => t('Secret API Key. Get your key from https://stripe.com/'),
-    '#default_value' => !empty($settings['secret_key']) ? $settings['secret_key'] : STRIPE_SECRET_KEY,
+    '#default_value' => !empty($settings['secret_key']) ? $settings['secret_key'] : '',
     '#required' => TRUE,
   );
   $form['public_key'] = array(
     '#type' => 'textfield',
     '#title' => t('Publishable Key'),
     '#description' => t('Publishable API Key. Get your key from https://stripe.com/'),
-    '#default_value' => !empty($settings['public_key']) ? $settings['public_key'] : STRIPE_PUBLIC_KEY,
+    '#default_value' => !empty($settings['public_key']) ? $settings['public_key'] : '',
     '#required' => TRUE,
   );
   $form['display_title'] = array(
@@ -155,7 +153,7 @@ function commerce_stripe_settings_form($settings) {
     '#title' => t('Integration type'),
     '#description' => t('Choose Stripe integration method: Stripe.js makes it easy to collect credit card (and other similarly sensitive) details without having the information touch your server.  Checkout is an embeddable iframe for desktop, tablet, and mobile devices.'),
     '#options' => array('stripejs' => t('stripe.js'), 'checkout' => t('checkout')),
-    '#default_value' => !empty($settings['integration_type']) ? $settings['integration_type'] : STRIPE_DEFAULT_INEGRATION,
+    '#default_value' => !empty($settings['integration_type']) ? $settings['integration_type'] : STRIPE_DEFAULT_INTEGRATION,
   );
   $form['checkout_settings'] = array(
     '#type' => 'fieldset',
@@ -242,7 +240,7 @@ function _commerce_stripe_credit_card_form() {
  */
 function commerce_stripe_submit_form($payment_method, $pane_values, $checkout_pane, $order) {
   global $user;
-  $integration_type = !empty($payment_method['settings']['integration_type']) ? $payment_method['settings']['integration_type'] : STRIPE_DEFAULT_INEGRATION;
+  $integration_type = !empty($payment_method['settings']['integration_type']) ? $payment_method['settings']['integration_type'] : STRIPE_DEFAULT_INTEGRATION;
   $order_wrapper = entity_metadata_wrapper('commerce_order', $order);
   $field = field_info_field('commerce_customer_address');
   $instance = field_info_instance('commerce_customer_profile', 'commerce_customer_address', 'billing');
