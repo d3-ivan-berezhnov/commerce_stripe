@@ -142,6 +142,7 @@ function commerce_stripe_refund_form_submit($form, &$form_state) {
     $refund_transaction->payload[REQUEST_TIME] = print_r($payload, TRUE);
     $refund_transaction->status = COMMERCE_PAYMENT_STATUS_SUCCESS;
     $refund_transaction->remote_id = $refund->id;
+    $refund_transaction->message = t('Refund issued.');
 
     // Save data on the initial charge and flag this transaction as a refund.
     $refund_transaction->data = array(
