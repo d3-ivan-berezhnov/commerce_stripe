@@ -59,6 +59,27 @@ function commerce_stripe_libraries_info() {
 function commerce_stripe_commerce_payment_method_info() {
   $payment_methods = array();
 
+  // The payment method info depends on the stripe integration method (stripe.js
+  // or Stripe Checkout) the administrator has selected.  We need to load
+  // the rules action to determine which integration method is selected.
+  $stripe_integration = STRIPE_DEFAULT_INTEGRATION;
+  $cardonfile = FALSE;
+  $payment_method_rule = rules_config_load('commerce_payment_commerce_stripe');
+  if ($payment_method_rule->active) {
+    foreach ($payment_method_rule->actions() as $action) {
+      // Skip any actions that are not simple rules actions. (i.e. loops)
+      if (!($action instanceof RulesAction)) {
+        continue;
+      }
+
+      if (!empty($action->settings['payment_method']['method_id']) && $action->settings['payment_method']['method_id'] == 'commerce_stripe') {
+        $stripe_integration = $action->settings['payment_method']['settings']['integration_type'];
+        $cardonfile = $action->settings['payment_method']['settings']['cardonfile'] ? TRUE : FALSE;
+        break;
+      }
+    }
+  }
+
   $payment_methods['commerce_stripe'] = array(
     'title' => t('Stripe'),
     'short_title' => t('Stripe'),
@@ -67,14 +88,27 @@ function commerce_stripe_commerce_payment_method_info() {
     'active' => FALSE,
     'terminal' => FALSE,
     'offsite' => FALSE,
-    'cardonfile' => array(
-      'charge callback' => 'commerce_stripe_cardonfile_charge',
-      'create form callback' => 'commerce_stripe_cardonfile_create_form',
-      'create callback' => 'commerce_stripe_cardonfile_create',
-      'update callback' => 'commerce_stripe_cardonfile_update',
-      'delete callback' => 'commerce_stripe_cardonfile_delete',
-    ),
   );
+
+  // Set the cardonfile settings.  We check that the administrator has enabled
+  // cardonfile functionality for commerce_stripe; if not, we do not add the
+  // cardonfile callbacks that would otherwise be called.
+  if ($cardonfile) {
+    // Allow charging and deleting saved cards for any Stripe integration method.
+    $payment_methods['commerce_stripe']['cardonfile'] = array(
+      'charge callback' => 'commerce_stripe_cardonfile_charge',
+      'delete callback' => 'commerce_stripe_cardonfile_delete',
+    );
+    // Allow creating and updating cards outside of the checkout process only
+    // when the Stripe integration method is stripejs.
+    if ($stripe_integration == 'stripejs') {
+      $payment_methods['commerce_stripe']['cardonfile'] += array(
+        'create form callback' => 'commerce_stripe_cardonfile_create_form',
+        'create callback' => 'commerce_stripe_cardonfile_create',
+        'update callback' => 'commerce_stripe_cardonfile_update',
+      );
+    }
+  }
 
   return $payment_methods;
 }
