@@ -128,9 +128,9 @@
                 $("#edit-continue").closest("form"),
                 $('div.payment-errors'),
                 function (form$) {
-                  submitButtons$.removeClass('auth-processing');
                   // Enable the submit button to allow resubmission.
-                  submitButtons$.removeAttr('disabled');
+                  form$.find('.checkout-continue').removeAttr("disabled").removeClass("auth-processing");
+                  submitButtons$.removeAttr('disabled').removeClass('auth-processing');
                   // Hide progress animated gif.
                   $('.checkout-processing').hide();
                 },
@@ -142,19 +142,25 @@
               );
 
               createToken(cardFields, responseHandler);
-	          }
+	    }
             else if (settings.stripe.integration_type == 'checkout') {
+              var token_created = false;
               var handler = StripeCheckout.configure({
                 key: settings.stripe.publicKey,
                 token: function(token) {
+                  token_created = true;
                   $('#stripe_token').val(token.id);
+
                   // And submit.
                   form$.get(0).submit(form$);
                 },
                 closed: function() {
-                  submitButtons$.removeClass('auth-processing');
-                  $('.checkout-processing').hide();
-                  submitButtons$.removeAttr("disabled");
+                  // Only re-enable the submit buttons if a token was not created.
+                  if (token_created == false) {
+                    submitButtons$.removeClass('auth-processing');
+                    $('.checkout-processing').hide();
+                    $('.form-submit').removeAttr("disabled");
+                  }
                 }
               });
 
