@@ -1,0 +1,4 @@
+core = 7.x
+hidden = TRUE
+name = commerce_stripe_test
+description = Used during testing of commerce_stripe.

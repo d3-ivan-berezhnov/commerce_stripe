@@ -2,6 +2,7 @@ name = Commerce Stripe
 description = Stripe payment gateway integration with Commerce
 core = 7.x
 package = Commerce (contrib)
+files[] = commerce_stripe.test
 dependencies[] = commerce
 dependencies[] = commerce_ui
 dependencies[] = commerce_payment
