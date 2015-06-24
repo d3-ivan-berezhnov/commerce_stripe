@@ -74,7 +74,7 @@ function commerce_stripe_commerce_payment_method_info() {
 
       if (!empty($action->settings['payment_method']['method_id']) && $action->settings['payment_method']['method_id'] == 'commerce_stripe') {
         $stripe_integration = $action->settings['payment_method']['settings']['integration_type'];
-        $cardonfile = $action->settings['payment_method']['settings']['cardonfile'] ? TRUE : FALSE;
+        $cardonfile = !empty($action->settings['payment_method']['settings']['cardonfile']) ? TRUE : FALSE;
         break;
       }
     }
@@ -380,7 +380,7 @@ function _commerce_stripe_credit_card_field_remove_name($content, $element) {
  */
 function commerce_stripe_submit_form_submit($payment_method, $pane_form, $pane_values, $order, $charge) {
   // If instructed to do so, try using the specified card on file.
-  if (module_exists('commerce_cardonfile') && $payment_method['settings']['cardonfile'] &&
+  if (module_exists('commerce_cardonfile') && !empty($payment_method['settings']['cardonfile']) &&
     !empty($pane_values['cardonfile']) && $pane_values['cardonfile'] !== 'new') {
     $card_data = commerce_cardonfile_load($pane_values['cardonfile']);
     if (empty($card_data) || $card_data->status == 0) {
