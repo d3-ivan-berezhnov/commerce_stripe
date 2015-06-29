@@ -9,6 +9,11 @@
       if (settings.stripe.fetched == null) {
         settings.stripe.fetched = true;
 
+        // Clear the token every time the payment form is loaded. We only need the token
+        // one time, as it is submitted to Stripe after a card is validated. If this
+        // form reloads it's due to an error; received tokens are stored in the checkout pane.
+        $('#stripe_token').val("");
+
         var createToken = function (cardFieldMap, responseHandler) {
           Stripe.setPublishableKey(settings.stripe.publicKey);
 
