@@ -921,3 +921,14 @@ function commerce_stripe_add_metadata(&$c, $order) {
     $c['metadata'] = $metadata;
   }
 }
+
+/**
+ * Implement hook_commerce_stripe_metadata and add our defaults.
+ */
+function commerce_stripe_commerce_stripe_metadata($order) {
+  return array(
+    'order_id' => $order->order_id,
+    'order_number' => $order->order_number,
+    'uid' => $order->uid,
+  );
+}
