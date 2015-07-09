@@ -189,6 +189,8 @@ function commerce_stripe_settings_form($settings) {
     '#options' => array('stripejs' => t('stripe.js'), 'checkout' => t('checkout')),
     '#default_value' => !empty($settings['integration_type']) ? $settings['integration_type'] : STRIPE_DEFAULT_INTEGRATION,
   );
+  // Stripe Checkout specific settings.
+  // @see: https://stripe.com/docs/checkout#integration-custom
   $form['checkout_settings'] = array(
     '#type' => 'fieldset',
     '#title' => t('These settings are specific to "checkout" integration type.'),
@@ -198,31 +200,77 @@ function commerce_stripe_settings_form($settings) {
       ),
     ),
   );
-  $form['checkout_settings']['panel_label'] = array(
+  // Highly recommended checkout options:
+  // Name
+  $form['checkout_settings']['name'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Name'),
+    '#description' => t('The name of your company or website.'),
+    '#default_value' => isset($settings['checkout_settings']['name']) ? $settings['checkout_settings']['name'] : variable_get('site_name', ''),
+  );
+  // Description
+  $form['checkout_settings']['description'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Description'),
+    '#description' => t('A description of the product or service being purchased.'),
+    '#default_value' => isset($settings['checkout_settings']['description']) ? $settings['checkout_settings']['description'] : '',
+  );
+  // Image
+  $form['checkout_settings']['image'] = array(
+    '#type' => 'managed_file',
+    '#title' => t('Image'),
+    '#progress_message' => t('Please wait...'),
+    '#progress_indicator' => 'bar',
+    '#description' => t('Click "Browse..." to select an image to upload.'),
+    '#required' => FALSE,
+    '#upload_location' => 'public://commerce_stripe/checkout_images/',
+    '#default_value' => isset($settings['checkout_settings']['image']) ? $settings['checkout_settings']['image']['fid'] : '',
+    '#element_validate' => array('commerce_stripe_settings_form_image_validate'),
+  );
+  // Optional checkout options:
+  // panelLabel
+  $form['checkout_settings']['panelLabel'] = array(
     '#type' => 'textfield',
     '#title' => t('Payment button label'),
-    '#description' => t('The label of the payment button in the Checkout form'),
-    '#default_value' => isset($settings['checkout_settings']['panel_label']) ? $settings['checkout_settings']['panel_label'] : 'Checkout',
+    '#description' => t('The label of the payment button in the Checkout form (e.g. “Subscribe”, “Pay {{amount}}”, etc.). If you include {{amount}}, it will be replaced by the provided amount. Otherwise, the amount will be appended to the end of your label.'),
+    '#default_value' => isset($settings['checkout_settings']['panelLabel']) ? $settings['checkout_settings']['panelLabel'] : "Pay {{amount}}",
   );
-  $form['checkout_settings']['verify_zipcode'] = array(
+  // zipCode
+  $form['checkout_settings']['zipCode'] = array(
     '#type' => 'checkbox',
     '#title' => t('ZIP code verification'),
-    '#description' => t('Specify whether Checkout should validate the billing ZIP code'),
-    '#default_value' => isset($settings['checkout_settings']['verify_zipcode']) ? $settings['checkout_settings']['verify_zipcode'] : 0,
+    '#description' => t('Specify whether Checkout should validate the billing ZIP code.'),
+    '#default_value' => isset($settings['checkout_settings']['zipCode']) ? $settings['checkout_settings']['zipCode'] : 0,
   );
-  $form['checkout_settings']['allow_remember_me'] = array(
+  // allowRememberMe
+  $form['checkout_settings']['allowRememberMe'] = array(
     '#type' => 'checkbox',
     '#title' => t('Show "Remember Me" option'),
     '#description' => t('Specify whether Checkout should allow the user to store their credit card for faster checkout.'),
-    '#default_value' => isset($settings['checkout_settings']['allow_remember_me']) ? $settings['checkout_settings']['allow_remember_me'] : 0,
+    '#default_value' => isset($settings['checkout_settings']['allowRememberMe']) ? $settings['checkout_settings']['allowRememberMe'] : 0,
   );
+  // bitcoin
   $form['checkout_settings']['bitcoin'] = array(
     '#type' => 'checkbox',
     '#title' => t('Accept Bitcoin'),
-    '#description' => t('When checked, Stripe Checkout will accept Bitcoin as payment.').
-      l(t('Must be enabled in your Stripe account.'), 'https://dashboard.stripe.com/account/bitcoin/enable'),
+     '#description' => t('When checked, Stripe Checkout will accept Bitcoin as payment.'). l(t('Must be enabled in your Stripe account.'), 'https://dashboard.stripe.com/account/bitcoin/enable'),
     '#default_value' => isset($settings['checkout_settings']['bitcoin']) ? $settings['checkout_settings']['bitcoin'] : 0,
   );
+  // billingAddress (Undocumented option)
+  $form['checkout_settings']['billingAddress'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Billing address'),
+    '#description' => t('Specify whether to enable billing address collection in Checkout.'),
+    '#default_value' => isset($settings['checkout_settings']['billingAddress']) ? $settings['checkout_settings']['billingAddress'] : 0,
+  );
+  // shippingAddress (Undocumented option)
+  $form['checkout_settings']['shippingAddress'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Shipping address'),
+    '#description' => t('Specify whether to enable shipping address collection in Checkout.'),
+    '#default_value' => isset($settings['checkout_settings']['shippingAddress']) ? $settings['checkout_settings']['shippingAddress'] : 0,
+  );
+
   if (module_exists('commerce_cardonfile')) {
     $form['cardonfile'] = array(
       '#type' => 'checkbox',
@@ -238,6 +286,25 @@ function commerce_stripe_settings_form($settings) {
   }
 
   return $form;
+}
+
+/**
+ * Custom validation callback for image field of stripe settings form.
+ * Uploaded image file is temporary by default, it'll be removed during the file garbage
+ * collection process. Change its status to FILE_STATUS_PERMANENT.
+ *
+ * @param array $element
+ * @param array $form_state
+ * @param array $form
+ */
+function commerce_stripe_settings_form_image_validate($element, &$form_state, $form) {
+  if (isset($element['fid']['#value'])) {
+    $file = file_load($element['fid']['#value']);
+    if (is_object($file) && $file->status !== FILE_STATUS_PERMANENT) {
+      $file->status = FILE_STATUS_PERMANENT;
+      file_save($file);
+    }
+  }
 }
 
 function _commerce_stripe_credit_card_form() {
@@ -313,23 +380,42 @@ function commerce_stripe_submit_form($payment_method, $pane_values, $checkout_pa
   }
   elseif ($integration_type == 'checkout') {
     $form = array();
+
     // Add pay button.
-    $verify_zipcode = !empty($payment_method['settings']['checkout_settings']['verify_zipcode']) ? $payment_method['settings']['checkout_settings']['verify_zipcode'] : 0;
-    $panel_label = !empty($payment_method['settings']['checkout_settings']['panel_label']) ? $payment_method['settings']['checkout_settings']['panel_label'] : 'Checkout';
     $order_wrapper = entity_metadata_wrapper('commerce_order', $order);
     $order_total = $order_wrapper->commerce_order_total->value();
 
-    // Add Stripe checkout embedding settings.
-    drupal_add_js(array('stripe' => array(
-      'panel_label' => t($panel_label),
+    // Add Checkout settings.
+    $checkout_settings = $payment_method['settings']['checkout_settings'];
+
+    // Clean up js settings before adding them to the page.
+    $checkout_settings = array_filter(array_map(function($value) {
+      if ($value === 0 OR $value === 1) {
+        $value = (bool) $value;
+      }
+      return $value;
+    }, $checkout_settings));
+
+    // Get the image file if one is set.
+    if (isset($checkout_settings['image']['fid'])) {
+      $image = file_load($checkout_settings['image']['fid']);
+      if (is_object($image)) {
+        $checkout_settings['image'] = file_create_url($image->uri);
+      }
+      else {
+        // Empty image setting will cause a broken image to be displayed in checkout
+        // iframe.
+        unset($checkout_settings['image']);
+      }
+    }
+
+    $checkout_settings += array(
       'currency' => $payment_method['settings']['stripe_currency'],
-      'name' => variable_get('site_name', ''),
-      'verify_zipcode' => ($verify_zipcode) ? TRUE : FALSE,
-      'client_email' => $order->mail,
-      'allow_remember_me' => !empty($payment_method['settings']['checkout_settings']['allow_remember_me']) ? 'true' : 'false',
-      'bitcoin' => !empty($payment_method['settings']['checkout_settings']['bitcoin']) ? 'true' : 'false',
+      'email' => $order->mail,
       'amount' => $order_total['amount'],
-    )), 'setting');
+    );
+
+    drupal_add_js(array('stripe' => array('checkout' => $checkout_settings)), 'setting');
 
     // Add external checkout.js library.
     drupal_add_js('https://checkout.stripe.com/checkout.js', 'external');

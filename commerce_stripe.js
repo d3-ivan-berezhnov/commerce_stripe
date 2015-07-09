@@ -169,16 +169,9 @@
                 }
               });
 
-              handler.open({
-                email: settings.stripe.client_email,
-                zipCode: settings.stripe.verify_zipcode,
-                name: settings.stripe.name,
-                currency: settings.stripe.currency,
-                panelLabel: settings.stripe.panel_label,
-                allowRememberMe: settings.stripe.allow_remember_me,
-                bitcoin: settings.stripe.bitcoin,
-                amount: settings.stripe.amount,
-              });
+              // Set Checkout options.
+              $options = Drupal.settings.stripe.checkout;
+              handler.open($options);
 
               // Close Checkout on page navigation
               $(window).bind('popstate', function() {
