@@ -944,19 +944,18 @@ function commerce_stripe_customer_id($uid, $instance_id) {
 }
 
 /**
- * implements hook_field_widget_WIDGET_TYPE_form_alter
+ * Implements hook_field_widget_WIDGET_TYPE_form_alter() for addressfield.
  *
- * set unique classes on address input fields to guarantee commerce_stripe.js can find them
+ * Set unique classes on billing address fields so that commerce_stripe.js can find them.
  *
  * @param $element
  * @param $form_state
  * @param $context
  */
 function commerce_stripe_field_widget_addressfield_standard_form_alter(&$element, &$form_state, $context) {
-  if (!$context['field']['field_name'] == 'commerce_customer_address') {
-    return;
+  if ($context['field']['field_name'] === 'commerce_customer_address' && $context['instance']['bundle'] === 'billing') {
+    commerce_stripe_set_addressfield_class_names($element);
   }
-  commerce_stripe_set_addressfield_class_names($element);
 }
 
 /**
