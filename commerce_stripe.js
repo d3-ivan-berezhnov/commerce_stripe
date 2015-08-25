@@ -91,10 +91,13 @@
               }
             }
 
+            var form$ = $("#edit-continue").closest("form");
+            var submitButtons$ = form$.find('.checkout-continue');
+
             // Prevent the form from submitting with the default action.
             if ($('#stripe_token').length && $('#stripe_token').val().length === 0) {
               event.preventDefault();
-              $('.form-submit').attr("disabled", "disabled");
+              submitButtons$.attr("disabled", "disabled");
             }
             else {
               return;
@@ -112,10 +115,7 @@
             $('.checkout-processing').show();
 
             // Disable the submit button to prevent repeated clicks.
-            $('.form-submit').attr("disabled", "disabled");
-
-            var form$ = $("#edit-continue").closest("form");
-            var submitButtons$ = form$.find('.checkout-continue');
+            submitButtons$.attr("disabled", "disabled");
 
             if (settings.stripe.integration_type == 'stripejs') {
               // Remove error reports from the last submission
@@ -156,15 +156,19 @@
                   token_created = true;
                   $('#stripe_token').val(token.id);
 
+                  // Set a triggering element for the form.
+                  var $btnTrigger = $('.form-submit.auth-processing').eq(0);
+                  var trigger$ = $("<input type='hidden' />").attr('name', $btnTrigger.attr('name')).attr('value', $btnTrigger.attr('value'));
+                  form$.append(trigger$);
+
                   // And submit.
                   form$.get(0).submit(form$);
                 },
                 closed: function() {
                   // Only re-enable the submit buttons if a token was not created.
                   if (token_created == false) {
-                    submitButtons$.removeClass('auth-processing');
+                    submitButtons$.removeClass('auth-processing').removeAttr("disabled");
                     $('.checkout-processing').hide();
-                    $('.form-submit').removeAttr("disabled");
                   }
                 }
               });
