@@ -486,6 +486,10 @@ function commerce_stripe_submit_form_submit($payment_method, $pane_form, $pane_v
   // Begin assembling charge parameters.
   Stripe::setApiKey($payment_method['settings']['secret_key']);
 
+  // Build a default description and offer modules the possibility to alter it.
+  $description = t('Order Number: @order_number', array('@order_number' => $order->order_number));
+  drupal_alter('commerce_stripe_order_description', $description, $order);
+
   $currency_code = $payment_method['settings']['stripe_currency'];
   if(isset($charge['currency_code'])){
     $currency_code = $charge['currency_code'];
@@ -494,7 +498,7 @@ function commerce_stripe_submit_form_submit($payment_method, $pane_form, $pane_v
     'amount' => $charge['amount'],
     'currency' => $currency_code,
     'card' => $pane_values['stripe_token'],
-    'description' => t('Order Number: @order_number', array('@order_number' => $order->order_number)),
+    'description' => $description,
   );
   commerce_stripe_add_metadata($c, $order);
   // To later store the card with all required fields, carry out necessary steps before making the charge request.
@@ -709,12 +713,17 @@ function commerce_stripe_cardonfile_charge($payment_method, $card_data, $order, 
 
   // Assemble charge parameters.
   Stripe::setApiKey($payment_method['settings']['secret_key']);
+
+  // Build a default description and offer modules the possibility to alter it.
+  $description = t('Order Number: @order_number', array('@order_number' => $order->order_number));
+  drupal_alter('commerce_stripe_order_description', $description, $order);
+
   $c = array(
     'amount' => $charge['amount'],
     'currency' => $currency_code,
     'customer' => $customer_id,
     'card' => $card_id,
-    'description' => t('Order Number: @order_number', array('@order_number' => $order->order_number)),
+    'description' => $description,
   );
   commerce_stripe_add_metadata($c, $order);
 
