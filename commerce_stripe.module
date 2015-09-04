@@ -520,6 +520,20 @@ function commerce_stripe_submit_form_submit($payment_method, $pane_form, $pane_v
   $transaction->instance_id = $payment_method['instance_id'];
   $transaction->amount = $charge['amount'];
   $transaction->currency_code = $currency_code;
+
+  /*
+  * save the transaction as pending. this will cause an exception to be thrown
+  * if the transaction cannot be saved. this prevents the scenario where it
+  * can go all the way through the try/catch below with success in stripe but
+  * failing to ever save the transaction. saving the transaction here also acts as
+  * an early catch to prevent the stripe charge from going through if the Drupal
+  * side will be unable to save it for some reason.
+  */
+  $transaction->status = COMMERCE_PAYMENT_STATUS_PENDING;
+  if (!_commerce_stripe_commerce_payment_transaction_save($transaction)) {
+    return FALSE;
+  }
+
   try {
     // Stripe does not appreciate $0 transfers.
     if ($charge['amount'] > 0) {
@@ -528,7 +542,7 @@ function commerce_stripe_submit_form_submit($payment_method, $pane_form, $pane_v
       $transaction->payload[REQUEST_TIME] = $response->__toJSON();
       $transaction->message = t('Payment completed successfully.');
       $transaction->status = COMMERCE_PAYMENT_STATUS_SUCCESS;
-      commerce_payment_transaction_save($transaction);
+      _commerce_stripe_commerce_payment_transaction_save($transaction);
       if (property_exists($response, 'card')) {
         $card_response = $response->card;
       }
@@ -549,13 +563,27 @@ function commerce_stripe_submit_form_submit($payment_method, $pane_form, $pane_v
     $transaction->payload[REQUEST_TIME] = $e->jsonBody;
     $transaction->message = t('Card processing error: @stripe_error', array('@stripe_error' => $e->getMessage()));
     $transaction->status = COMMERCE_PAYMENT_STATUS_FAILURE;
-    commerce_payment_transaction_save($transaction);
+    _commerce_stripe_commerce_payment_transaction_save($transaction);
     return FALSE;
   }
 
   // If so instructed by the customer, save the card.
   if (!empty($save_card)) {
     _commerce_stripe_save_cardonfile($card_response, $order->uid, $payment_method, $pane_values['cardonfile_instance_default']);
+  }
+}
+
+/**
+ * attempt to save the transaction and set messages if unsuccessful
+ */
+function _commerce_stripe_commerce_payment_transaction_save($transaction) {
+  if (!commerce_payment_transaction_save($transaction)) {
+    drupal_set_message(t('Our site is currently unable to process your card. Please contact the site administrator to complete your transaction'), 'error');
+    watchdog('commerce_stripe', 'commerce_payment_transaction_save returned false in saving a stripe transaction for order_id @order_id.', array('@order_id' => $transaction->order_id), WATCHDOG_ERROR);
+    return FALSE;
+  }
+  else {
+    return TRUE;
   }
 }
 
@@ -732,6 +760,12 @@ function commerce_stripe_cardonfile_charge($payment_method, $card_data, $order, 
   $transaction->amount = $charge['amount'];
   $transaction->currency_code = $currency_code;
 
+  // save as pending to ensure the drupal side of things is working before we attempt the stripe api call
+  $transaction->status = COMMERCE_PAYMENT_STATUS_PENDING;
+  if (!_commerce_stripe_commerce_payment_transaction_save($transaction)) {
+    return FALSE;
+  }
+
   try {
     $lock = __FUNCTION__ .'_'. $order->order_id;
     if (lock_acquire($lock) && ($charge['amount'] > 0)) {
@@ -740,7 +774,7 @@ function commerce_stripe_cardonfile_charge($payment_method, $card_data, $order, 
       $transaction->payload[REQUEST_TIME] = $response->__toJSON();
       $transaction->message = t('Payment completed successfully.');
       $transaction->status = COMMERCE_PAYMENT_STATUS_SUCCESS;
-      commerce_payment_transaction_save($transaction);
+      _commerce_stripe_commerce_payment_transaction_save($transaction);
       lock_release($lock);
       return TRUE;
     }
@@ -751,7 +785,7 @@ function commerce_stripe_cardonfile_charge($payment_method, $card_data, $order, 
     $transaction->payload[REQUEST_TIME] = $e->jsonBody;
     $transaction->message = t('Card processing error: @stripe_error', array('@stripe_error' => $e->getMessage()));
     $transaction->status = COMMERCE_PAYMENT_STATUS_FAILURE;
-    commerce_payment_transaction_save($transaction);
+    _commerce_stripe_commerce_payment_transaction_save($transaction);
     lock_release($lock);
     return FALSE;
   }
