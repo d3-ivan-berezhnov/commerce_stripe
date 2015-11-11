@@ -65,7 +65,7 @@ function commerce_stripe_commerce_payment_method_info() {
   $stripe_integration = STRIPE_DEFAULT_INTEGRATION;
   $cardonfile = FALSE;
   $payment_method_rule = rules_config_load('commerce_payment_commerce_stripe');
-  if ($payment_method_rule->active) {
+  if ($payment_method_rule && $payment_method_rule->active) {
     foreach ($payment_method_rule->actions() as $action) {
       // Skip any actions that are not simple rules actions. (i.e. loops)
       if (!($action instanceof RulesAction)) {
