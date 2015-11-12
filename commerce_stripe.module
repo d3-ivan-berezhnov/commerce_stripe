@@ -488,7 +488,6 @@ function commerce_stripe_submit_form_submit($payment_method, $pane_form, $pane_v
 
   // Build a default description and offer modules the possibility to alter it.
   $description = t('Order Number: @order_number', array('@order_number' => $order->order_number));
-  drupal_alter('commerce_stripe_order_description', $description, $order);
 
   $currency_code = $payment_method['settings']['stripe_currency'];
   if(isset($charge['currency_code'])){
@@ -500,7 +499,14 @@ function commerce_stripe_submit_form_submit($payment_method, $pane_form, $pane_v
     'card' => $pane_values['stripe_token'],
     'description' => $description,
   );
+
+  // The metadata could be added via the alter below but for compatibility
+  // reasons it may stay.
   commerce_stripe_add_metadata($c, $order);
+
+  // Let modules alter the charge object to add attributes.
+  drupal_alter('commerce_stripe_order_charge', $c, $order);
+
   // To later store the card with all required fields, carry out necessary steps before making the charge request.
   if (module_exists('commerce_cardonfile') && !empty($payment_method['settings']['cardonfile']) &&
     !empty($pane_values['credit_card']['cardonfile_store']) && $pane_values['credit_card']['cardonfile_store']) {
@@ -744,7 +750,6 @@ function commerce_stripe_cardonfile_charge($payment_method, $card_data, $order, 
 
   // Build a default description and offer modules the possibility to alter it.
   $description = t('Order Number: @order_number', array('@order_number' => $order->order_number));
-  drupal_alter('commerce_stripe_order_description', $description, $order);
 
   $c = array(
     'amount' => $charge['amount'],
@@ -753,7 +758,11 @@ function commerce_stripe_cardonfile_charge($payment_method, $card_data, $order, 
     'card' => $card_id,
     'description' => $description,
   );
+
   commerce_stripe_add_metadata($c, $order);
+
+  // Let modules alter the charge object to add attributes.
+  drupal_alter('commerce_stripe_order_charge', $c, $order);
 
   $transaction = commerce_payment_transaction_new('commerce_stripe', $order->order_id);
   $transaction->instance_id = $payment_method['instance_id'];
