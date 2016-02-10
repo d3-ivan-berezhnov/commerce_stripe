@@ -73,7 +73,10 @@ function commerce_stripe_commerce_payment_method_info() {
       }
 
       if (!empty($action->settings['payment_method']['method_id']) && $action->settings['payment_method']['method_id'] == 'commerce_stripe') {
-        $stripe_integration = $action->settings['payment_method']['settings']['integration_type'];
+        // Default to Stripe.js if no integration_type has been chosen.
+        if (!empty($action->settings['payment_method']['settings']['integration_type'])) {
+          $stripe_integration = $action->settings['payment_method']['settings']['integration_type'];
+        }
         $cardonfile = !empty($action->settings['payment_method']['settings']['cardonfile']) ? TRUE : FALSE;
         break;
       }
@@ -702,13 +705,28 @@ function _commerce_stripe_save_cardonfile($card, $uid, $payment_method, $set_def
  */
 function commerce_stripe_commerce_payment_method_info_alter(&$payment_methods) {
   if (isset($payment_methods['commerce_stripe'])) {
-    $settings = _commerce_stripe_load_settings();
-
-    if (empty($settings['secret_key']) || empty($settings['public_key'])) {
-      if (user_access('administer payment methods')) {
-        drupal_set_message('Stripe secret and public key are required in order to use Stripe payment method. See README.txt for instructions.', 'warning');
-      }
+    // Just return if they don't have permission to see these errors.
+    if (!user_access('administer payment methods')) {
+      return;
     }
+    $found_errors = FALSE;
+    $settings = _commerce_stripe_load_settings();
+    // If secret_key or public_key is not set.
+    if (empty($settings['secret_key']) || empty($settings['public_key'])) {
+        $found_errors = TRUE;
+        drupal_set_message(t('Stripe secret and public key are required in order to use Stripe payment method. See README.txt for instructions.'), 'warning');
+    }
+    // If integration_type is not set.
+    if (empty($settings['integration_type'])) {
+        $found_errors = TRUE;
+        drupal_set_message(t('The Stripe payment method "Integration type" is not set. Stripe.js will be used by default.'), 'warning');
+    }
+    // If they need to configure anything, be nice and give them the link.
+    if ($found_errors) {
+      $link = l(t('configured here'), 'admin/commerce/config/payment-methods');
+      drupal_set_message(t('Settings required for the Stripe payment method can be !link.', array('!link' => $link)), 'warning');
+    }
+
   }
 }
 
