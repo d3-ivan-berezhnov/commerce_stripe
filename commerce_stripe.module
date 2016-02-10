@@ -853,18 +853,16 @@ function commerce_stripe_cardonfile_create_form($form, &$form_state, $op, $card_
     '#default_value' => FALSE,
   );
 
-  $available_countries = NULL;
-  if (isset($form_state['input']['country'])) {
-    $available_countries = array($form_state['input']['country'] => NULL);
-  }
+  // Create a billing profile object and add the address form.
+  $profile = commerce_customer_profile_new('billing', $form_state['card']->uid);
+  $form_state['commerce_customer_profile'] = $profile;
+  $form['commerce_customer_profile'] = array();
+  field_attach_form('commerce_customer_profile', $profile, $form['commerce_customer_profile'], $form_state);
 
-  $field = field_info_field('commerce_customer_address');
-  $instance = field_info_instance('commerce_customer_profile', 'commerce_customer_address', 'billing');
+  $form['commerce_customer_profile']['#weight'] = -1;
 
-  $form['address'] = addressfield_generate(
-    addressfield_default_values($field, $instance, array($available_countries)),
-    array('address' => 'address'),
-    array('mode' => 'form'));
+  // Add a validation callback so that we can call field_attach functions.
+  $form['#validate'][] = 'commerce_stripe_cardonfile_create_validate';
 
   commerce_stripe_set_addressfield_class_names($form['address']);
 
@@ -874,6 +872,14 @@ function commerce_stripe_cardonfile_create_form($form, &$form_state, $op, $card_
   );
 
   return $form;
+}
+
+/**
+ * Validation callback for card on file creation.
+ */
+function commerce_stripe_cardonfile_create_validate($form, &$form_state) {
+  $profile = $form_state['commerce_customer_profile'];
+  field_attach_form_validate('commerce_customer_profile', $profile, $form['commerce_customer_profile'], $form_state);
 }
 
 function commerce_stripe_cardonfile_create_form_submit($form, &$form_state) {
