@@ -182,6 +182,12 @@ function commerce_stripe_settings_form($settings) {
     '#description' => t('Payment method display title'),
     '#default_value' => !empty($settings['display_title']) ? $settings['display_title'] : t('Stripe'),
   );
+  $form['receipt_email'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Email receipts'),
+    '#description' => t('When selected, customers will receive email receipts from Stripe.'),
+    '#default_value' => isset($settings['receipt_email']) ? $settings['receipt_email'] : 0,
+  );
   $form['integration_type'] = array(
     '#type' => 'select',
     '#title' => t('Integration type'),
@@ -499,6 +505,11 @@ function commerce_stripe_submit_form_submit($payment_method, $pane_form, $pane_v
     'card' => $pane_values['stripe_token'],
     'description' => $description,
   );
+
+  // Specify that we want to send a receipt email if we are configured to do so.
+  if (!empty($payment_method['settings']['receipt_email'])) {
+    $c['receipt_email'] = $order->mail;
+  }
 
   // The metadata could be added via the alter below but for compatibility
   // reasons it may stay.
