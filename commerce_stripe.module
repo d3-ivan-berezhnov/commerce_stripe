@@ -872,7 +872,7 @@ function commerce_stripe_cardonfile_create_form($form, &$form_state, $op, $card_
   );
 
   // Create a billing profile object and add the address form.
-  $profile = commerce_customer_profile_new('billing', $form_state['card']->uid);
+  $profile = commerce_customer_profile_new('billing', $form_state['card_data']->uid);
   $form_state['commerce_customer_profile'] = $profile;
   $form['commerce_customer_profile'] = array();
   field_attach_form('commerce_customer_profile', $profile, $form['commerce_customer_profile'], $form_state);
