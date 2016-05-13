@@ -188,19 +188,74 @@
           }
         });
 
+        // @todo: See if code duplication can be reduced here.
         $('#commerce-stripe-cardonfile-create-form').delegate('#edit-submit', 'click', function (event) {
-          var cardFields = {
-            number: 'edit-credit-card-number',
-            cvc: 'edit-credit-card-code',
-            exp_month: 'edit-credit-card-exp-month',
-            exp_year: 'edit-credit-card-exp-year',
-            name: 'edit-credit-card-owner'
-          };
+          if (settings.stripe.integration_type === 'stripejs') {
+            var cardFields = {
+              number: 'edit-credit-card-number',
+              cvc: 'edit-credit-card-code',
+              exp_month: 'edit-credit-card-exp-month',
+              exp_year: 'edit-credit-card-exp-year',
+              name: 'edit-credit-card-owner'
+            };
 
-          var responseHandler = makeResponseHandler($('#commerce-stripe-cardonfile-create-form'), $('#card-errors'));
+            var responseHandler = makeResponseHandler($('#commerce-stripe-cardonfile-create-form'), $('#card-errors'));
 
-          createToken(cardFields, responseHandler);
+            createToken(cardFields, responseHandler);
+          }
+          if (settings.stripe.integration_type == 'checkout') {
+            var submitButtons$ = $("#edit-submit");
+            var form$ = submitButtons$.closest("form");
 
+            // Prevent the form from submitting with the default action.
+            if ($('#stripe_token').length && $('#stripe_token').val().length === 0) {
+              event.preventDefault();
+              submitButtons$.attr("disabled", "disabled");
+            }
+            else {
+              return;
+            }
+
+            // Prevent duplicate submissions to stripe from multiple clicks
+            if ($(this).hasClass('auth-processing')) {
+              return false;
+            }
+            $(this).addClass('auth-processing');
+            var token_created = false;
+            var handler = StripeCheckout.configure({
+              key: settings.stripe.publicKey,
+              token: function (token) {
+                token_created = true;
+                $('#stripe_token').val(token.id);
+
+                // Set a triggering element for the form.
+                var $btnTrigger = $('.form-submit.auth-processing').eq(0);
+                var trigger$ = $("<input type='hidden' />").attr('name', $btnTrigger.attr('name')).attr('value', $btnTrigger.attr('value'));
+                form$.append(trigger$);
+
+                // And submit.
+                form$.get(0).submit(form$);
+              },
+              closed: function () {
+                // Only re-enable the submit buttons if a token was not created.
+                if (token_created == false) {
+                  submitButtons$.removeClass('auth-processing').removeAttr("disabled");
+                  $('.checkout-processing').hide();
+                }
+              }
+            });
+
+            // Set Checkout options.
+            $options = Drupal.settings.stripe.checkout;
+            handler.open($options);
+
+            // Close Checkout on page navigation
+            $(window).bind('popstate', function () {
+              handler.close();
+            });
+          }
+
+          // Prevent the form from submitting with the default action.
           return false;
         });
       }
