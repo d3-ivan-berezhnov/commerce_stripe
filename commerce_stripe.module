@@ -47,6 +47,29 @@ function commerce_stripe_libraries_info() {
       'files' => array(
         'php' => array(
           'lib/Stripe.php',
+          'lib/Error/Base.php',
+          'lib/Error/InvalidRequest.php',
+          'lib/Error/Api.php',
+          'lib/Error/ApiConnection.php',
+          'lib/Error/Authentication.php',
+          'lib/Error/Card.php',
+          'lib/Error/RateLimit.php',
+          'lib/HttpClient/ClientInterface.php',
+          'lib/HttpClient/CurlClient.php',
+          'lib/Util/Util.php',
+          'lib/Util/Set.php',
+          'lib/Util/RequestOptions.php',
+          'lib/JsonSerializable.php',
+          'lib/StripeObject.php',
+          'lib/ApiResource.php',
+          'lib/ExternalAccount.php',
+          'lib/Card.php',
+          'lib/ApiResponse.php',
+          'lib/Collection.php',
+          'lib/ApiRequestor.php',
+          'lib/AttachedObject.php',
+          'lib/Charge.php',
+          'lib/Customer.php',
         ),
       ),
     ),
@@ -151,17 +174,17 @@ function commerce_stripe_return_access($order, $transaction) {
  */
 function commerce_stripe_settings_form($settings) {
   $form = array();
+  $currencies = commerce_currencies(TRUE);
+  $stripe_currency_list = array();
+
+  foreach ($currencies as $currency_code => $currency) {
+    $stripe_currency_list[$currency_code] = $currency['name'];
+  }
+
   $form['stripe_currency'] = array(
     '#type' => 'select',
     '#title' => t('Currency'),
-    '#options' => array(
-      'CAD' => t('CAD'),
-      'EUR' => t('EUR'),
-      'GBP' => t('GBP'),
-      'USD' => t('USD'),
-      'AUD' => t('AUD'),
-      'CHF' => t('CHF'),
-    ),
+    '#options' => $stripe_currency_list,
     '#description' => t('Select the currency that you are using.'),
     '#default_value' => !empty($settings['stripe_currency']) ? $settings['stripe_currency'] : 'USD',
   );
@@ -496,7 +519,7 @@ function commerce_stripe_submit_form_submit($payment_method, $pane_form, $pane_v
   }
 
   // Begin assembling charge parameters.
-  Stripe::setApiKey($payment_method['settings']['secret_key']);
+  Stripe\Stripe::setApiKey($payment_method['settings']['secret_key']);
 
   // Build a default description and offer modules the possibility to alter it.
   $description = t('Order Number: @order_number', array('@order_number' => $order->order_number));
@@ -560,23 +583,14 @@ function commerce_stripe_submit_form_submit($payment_method, $pane_form, $pane_v
   try {
     // Stripe does not appreciate $0 transfers.
     if ($charge['amount'] > 0) {
-      $response = Stripe_Charge::create($c);
+      $response = Stripe\Charge::create($c);
       $transaction->remote_id = $response->id;
       $transaction->payload[REQUEST_TIME] = $response->__toJSON();
       $transaction->message = t('Payment completed successfully.');
       $transaction->status = COMMERCE_PAYMENT_STATUS_SUCCESS;
       _commerce_stripe_commerce_payment_transaction_save($transaction);
-      if (property_exists($response, 'card')) {
-        $card_response = $response->card;
-      }
-      else {
-        $card_response = $response->source;
-      }
     }
     // If the total is $0 we just put the card on file.
-    else {
-      $card_response = $card;
-    }
   }
   catch (Exception $e) {
     drupal_set_message(t('We received the following error processing your card. Please enter your information again or try a different card.'), 'error');
@@ -592,7 +606,7 @@ function commerce_stripe_submit_form_submit($payment_method, $pane_form, $pane_v
 
   // If so instructed by the customer, save the card.
   if (!empty($save_card)) {
-    _commerce_stripe_save_cardonfile($card_response, $order->uid, $payment_method, $pane_values['cardonfile_instance_default']);
+    _commerce_stripe_save_cardonfile($response->source, $order->uid, $payment_method, $pane_values['cardonfile_instance_default']);
   }
 }
 
@@ -614,30 +628,27 @@ function _commerce_stripe_create_card($stripe_token, $uid, $payment_method) {
   if (!commerce_stripe_load_library()) {
     return FALSE;
   }
-  Stripe::setApiKey($payment_method['settings']['secret_key']);
+  Stripe\Stripe::setApiKey($payment_method['settings']['secret_key']);
 
   // If there is no existing customer id, use the Stripe form token to create one.
   $stripe_customer_id = commerce_stripe_customer_id($uid, $payment_method['instance_id']);
+
   if (!$stripe_customer_id) {
     $account = user_load($uid);
     try {
-      $customer = Stripe_Customer::create(array(
+      $customer = Stripe\Customer::create(array(
         'card' => $stripe_token,
         'email' => $account->mail,
+        'description' => t('Customer for :mail', array(':mail' => $account->mail)),
+        'source' => $stripe_token,
       ));
-      if (property_exists($customer, 'cards')) {
-        foreach ($customer->cards->data as $card) {
-          if ($card->id == $customer->default_card) {
-            return $card;
-          }
-        }
-      }
-      else {
-        foreach ($customer->sources->data as $card) {
-          if ($card->object == 'card' && $card->id == $customer->default_source) {
-            return $card;
-          }
-        }
+      $cards = Stripe\Customer::retrieve($customer->id)->sources->all(array(
+        'object' => 'card',
+      ));
+
+      $cards_array = Stripe\Util\Util::convertStripeObjectToArray(array($cards));
+      // @todo current\default card      foreach ($cards_array[0]['data'] as $card) {
+        return (object)$card;
       }
     }
     catch (Exception $e) {
@@ -646,16 +657,11 @@ function _commerce_stripe_create_card($stripe_token, $uid, $payment_method) {
       return FALSE;
     }
   }
-  // If the customer id already existed, use the Stripe form token to create the new card.
+  // If the customer id already exists, use the Stripe form token to create the new card.
   else {
     try {
-      $customer = Stripe_Customer::retrieve($stripe_customer_id);
-      if (property_exists($customer, 'cards')) {
-        $card = $customer->cards->create(array('card' => $stripe_token));
-      }
-      else {
-        $card = $customer->sources->create(array('card' => $stripe_token));
-      }
+      $customer = Stripe\Customer::retrieve($stripe_customer_id);
+      $card = $customer->sources->create(array('source' => $stripe_token));
       return $card;
     }
     catch (Exception $e) {
@@ -676,20 +682,13 @@ function _commerce_stripe_save_cardonfile($card, $uid, $payment_method, $set_def
   $card_data->payment_method = $payment_method['method_id'];
   $card_data->instance_id = $payment_method['instance_id'];
   $card_data->remote_id = $remote_id;
-  $card_data->card_type = $card->type;
+  $card_data->card_type = $card->brand;
   $card_data->card_name = $card->name;
   $card_data->card_number = $card->last4;
   $card_data->card_exp_month = $card->exp_month;
   $card_data->card_exp_year = $card->exp_year;
   $card_data->status = 1;
   $card_data->instance_default = 0;
-
-  if (property_exists($card, 'type')) {
-    $card_data->card_type = $card->type;
-  }
-  else {
-    $card_data->card_type = $card->brand;
-  }
 
   commerce_cardonfile_save($card_data);
 
@@ -778,7 +777,7 @@ function commerce_stripe_cardonfile_charge($payment_method, $card_data, $order, 
   }
 
   // Assemble charge parameters.
-  Stripe::setApiKey($payment_method['settings']['secret_key']);
+  Stripe\Stripe::setApiKey($payment_method['settings']['secret_key']);
 
   // Build a default description and offer modules the possibility to alter it.
   $description = t('Order Number: @order_number', array('@order_number' => $order->order_number));
@@ -810,7 +809,7 @@ function commerce_stripe_cardonfile_charge($payment_method, $card_data, $order, 
   try {
     $lock = __FUNCTION__ .'_'. $order->order_id;
     if (lock_acquire($lock) && ($charge['amount'] > 0)) {
-      $response = Stripe_Charge::create($c);
+      $response = Stripe\Charge::create($c);
       $transaction->remote_id = $response->id;
       $transaction->payload[REQUEST_TIME] = $response->__toJSON();
       $transaction->message = t('Payment completed successfully.');
@@ -1062,9 +1061,10 @@ function commerce_stripe_cardonfile_create_form_submit($form, &$form_state) {
  */
 function commerce_stripe_cardonfile_create($form, &$form_state, $payment_method, $card_data) {
   $card = _commerce_stripe_create_card($form_state['values']['stripe_token'], $card_data->uid, $payment_method);
-  if (!$card) {
+  if (!$card || !isset($card['customer'])) {
     return;
   }
+
   _commerce_stripe_save_cardonfile($card, $card_data->uid, $payment_method, $form_state['values']['credit_card']['cardonfile_instance_default']);
 }
 
@@ -1135,7 +1135,7 @@ function commerce_stripe_cardonfile_update_form($form, &$form_state, $op, $card_
   }
 
   // Load the billing profile associated with this card and populate the address form.
-  if (!empty($wrapper->commerce_cardonfile_profile->value())) {
+  if ($wrapper->isset('commerce_cardonfile_profile') && !empty($wrapper->commerce_cardonfile_profile->value())) {
     $profile = $wrapper->commerce_cardonfile_profile->value();
   }
   else {
@@ -1213,15 +1213,10 @@ function commerce_stripe_cardonfile_update($form, &$form_state, $payment_method,
   // Fetch the customer id and card id from $card_data->remote_id
   list($customer_id, $card_id) = explode('|', $card_data->remote_id);
 
-  Stripe::setApiKey($payment_method['settings']['secret_key']);
+  Stripe\Stripe::setApiKey($payment_method['settings']['secret_key']);
   try {
-    $customer = Stripe_Customer::retrieve($customer_id);
-    if (property_exists($customer, 'cards')) {
-      $card = $customer->cards->retrieve($card_id);
-    }
-    else {
-      $card = $customer->sources->retrieve($card_id);
-    }
+    $customer = Stripe\Customer::retrieve($customer_id);
+    $card = $customer->sources->retrieve($card_id);
     $card->exp_month = $form_state['values']['credit_card']['exp_month'];
     $card->exp_year = $form_state['values']['credit_card']['exp_year'];
     $card->save();
@@ -1245,15 +1240,10 @@ function commerce_stripe_cardonfile_delete($form, &$form_state, $payment_method,
   // Fetch the customer id and card id from $card_data->remote_id
   list($customer_id, $card_id) = explode('|', $card_data->remote_id);
 
-  Stripe::setApiKey($payment_method['settings']['secret_key']);
+  Stripe\Stripe::setApiKey($payment_method['settings']['secret_key']);
   try {
-    $customer = Stripe_Customer::retrieve($customer_id);
-    if (property_exists($customer, 'card')) {
-      $customer->cards->retrieve($card_id)->delete();
-    }
-    else {
-      $customer->sources->retrieve($card_id)->delete();
-    }
+    $customer = Stripe\Customer::retrieve($customer_id);
+    $customer->sources->retrieve($card_id)->delete();
     return TRUE;
   }
   catch (Exception $e) {
