@@ -637,6 +637,18 @@ function _commerce_stripe_commerce_payment_transaction_save($transaction) {
   }
 }
 
+/**
+ * Call Stripe to create card for a user.
+ *
+ * @param string $stripe_token
+ *   Token of the card.
+ * @param int $uid
+ *   User identifier of the card owner.
+ * @param array $payment_method
+ *   Array containing payment_method informations.
+ *
+ * @return bool
+ */
 function _commerce_stripe_create_card($stripe_token, $account, $payment_method, $throw_exceptions = FALSE) {
   if (!commerce_stripe_load_library()) {
     return FALSE;
