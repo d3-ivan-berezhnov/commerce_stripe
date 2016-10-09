@@ -108,6 +108,7 @@ function commerce_stripe_commerce_payment_method_info() {
       'delete callback' => 'commerce_stripe_cardonfile_delete',
       'create form callback' => 'commerce_stripe_cardonfile_create_form',
       'create callback' => 'commerce_stripe_cardonfile_create',
+      'update form callback' => 'commerce_stripe_cardonfile_update_form',
       'update callback' => 'commerce_stripe_cardonfile_update',
     );
   }
@@ -837,9 +838,13 @@ function commerce_stripe_cardonfile_charge($payment_method, $card_data, $order, 
  * Card on file callback: create form
  */
 function commerce_stripe_cardonfile_create_form($form, &$form_state, $op, $card_data) {
+  $account = menu_get_object('user');
+  // @todo: Check for a customer_id we can reuse from Stripe.
+
   // Pass along information to the validate and submit handlers.
   $form_state['card_data'] = $card_data;
   $form_state['op'] = $op;
+  $form_state['user'] = $account;
 
   $stripe_integration = _commerce_stripe_load_setting('integration_type', STRIPE_DEFAULT_INTEGRATION);
   if ($stripe_integration === 'stripejs') {
@@ -861,9 +866,7 @@ function commerce_stripe_cardonfile_create_form($form, &$form_state, $op, $card_
 
     $checkout_currency = _commerce_stripe_load_setting('stripe_currency');
 
-    // Since there is no associated order, just use the logged-in user's email
-    // address.
-    $email = $GLOBALS['user']->mail;
+    $email = $account->mail;
 
     // Add Checkout settings.
     $checkout_settings = _commerce_stripe_load_setting('checkout_settings');
@@ -884,25 +887,69 @@ function commerce_stripe_cardonfile_create_form($form, &$form_state, $op, $card_
   $stripe_token = !empty($form_state['values']['stripe_token']) ? $form_state['values']['stripe_token'] : '';
   _commerce_stripe_form_configure_stripe_common($form, $stripe_token, $public_key, $stripe_integration);
 
-
   $payment_method = commerce_payment_method_instance_load($card_data->instance_id);
 
+  $stored_cards = commerce_cardonfile_load_multiple_by_uid($account->uid, $payment_method['instance_id']);
+
+  // Check for stored cards.
+  if (!empty($stored_cards)) {
+    $valid_cards = array_filter($stored_cards, 'commerce_cardonfile_validate_card_expiration');
+  }
+
+  // Depending on if the user has other valid cards, we give them the option to set a default.
   $form['credit_card']['cardonfile_instance_default'] = array(
     '#type' => 'checkbox',
     '#title' => t('Use as default card for payments with %method', array('%method' => $payment_method['display_title'])),
-    '#default_value' => FALSE,
+    '#default_value' => empty($valid_cards) ? TRUE : FALSE,
+    '#disabled' => empty($valid_cards) ? TRUE : FALSE,
   );
 
   // Create a billing profile object and add the address form.
-  $profile = commerce_customer_profile_new('billing', $GLOBALS['user']->uid);
-  $form_state['commerce_customer_profile'] = $profile;
-  $form['commerce_customer_profile'] = array();
-  field_attach_form('commerce_customer_profile', $profile, $form['commerce_customer_profile'], $form_state);
+  $profile = commerce_customer_profile_new('billing', $account->uid);
 
-  $form['commerce_customer_profile']['#weight'] = -1;
+  // Add the entity context of the current cart order.
+  $profile->entity_context = array(
+    'entity_type' => 'commerce_cardonfile',
+    'entity_id' => $card_data->card_id,
+  );
+
+  $form['commerce_customer_profile'] = array(
+    '#type' => 'value',
+    '#value' => $profile,
+  );
+
+  // Add the field widgets for the profile.
+  field_attach_form('commerce_customer_profile', $profile, $form, $form_state);
 
   // Add a validation callback so that we can call field_attach functions.
   $form['#validate'][] = 'commerce_stripe_cardonfile_create_validate';
+
+  // Tweak the form to remove the fieldset from the address field if there
+  // is only one on this profile.
+  $addressfields = array();
+
+  foreach (commerce_info_fields('addressfield', 'commerce_customer_profile') as $field_name => $field) {
+    if (!empty($form['address'][$field_name]['#language'])) {
+      $langcode = $form['address'][$field_name]['#language'];
+
+      // Only consider this addressfield if it's represented on the form.
+      if (!empty($form['address'][$field_name][$langcode])) {
+        $addressfields[] = array($field_name, $langcode);
+      }
+    }
+  }
+
+  // Check to ensure only one addressfield was found on the form.
+  if (count($addressfields) == 1) {
+    list($field_name, $langcode) = array_shift($addressfields);
+
+    foreach (element_children($form['address'][$field_name][$langcode]) as $delta) {
+      // Don't mess with the "Add another item" button that could be present.
+      if ($form['address'][$field_name][$langcode][$delta]['#type'] != 'submit') {
+        $form['address'][$field_name][$langcode][$delta]['#type'] = 'container';
+      }
+    }
+  }
 
   commerce_stripe_set_addressfield_class_names($form['address']);
 
@@ -999,8 +1046,8 @@ function _commerce_stripe_form_add_credit_card_form(&$form) {
  * Validation callback for card on file creation.
  */
 function commerce_stripe_cardonfile_create_validate($form, &$form_state) {
-  $profile = $form_state['commerce_customer_profile'];
-  field_attach_form_validate('commerce_customer_profile', $profile, $form['commerce_customer_profile'], $form_state);
+  $profile = $form_state['values']['commerce_customer_profile'];
+  field_attach_form_validate('commerce_customer_profile', $profile, $form, $form_state);
 }
 
 function commerce_stripe_cardonfile_create_form_submit($form, &$form_state) {
@@ -1019,6 +1066,140 @@ function commerce_stripe_cardonfile_create($form, &$form_state, $payment_method,
     return;
   }
   _commerce_stripe_save_cardonfile($card, $card_data->uid, $payment_method, $form_state['values']['credit_card']['cardonfile_instance_default']);
+}
+
+/**
+ * Card on file callback: Update form
+ */
+function commerce_stripe_cardonfile_update_form($form, &$form_state, $op, $card_data) {
+  $account = menu_get_object('user');
+
+  // @todo: Check for a customer_id we can reuse from Stripe.
+  $form_state['card_data'] = $card_data;
+  $form_state['op'] = $op;
+  $form_state['user'] = $account;
+
+  $form['errors'] = array(
+    '#markup' => '<div id="card-errors"></div>'
+  );
+
+  // Add the active card's details so the user knows which one she's updating.
+  $card['number'] = t('xxxxxx '.$card_data->card_number);
+  $card['owner'] = t($card_data->card_name);
+  $card['exp_month'] = strlen($card_data->card_exp_month) == 1 ? '0' . $card_data->card_exp_month : $card_data->card_exp_month;
+  $card['exp_year'] = $card_data->card_exp_year;
+
+  // Because this is an update operation we implement the payment form directly.
+  $fields = array('owner' => $card['owner'],'code' => '', 'exp_month' => $card['exp_month'], 'exp_year' => $card['exp_year']);
+
+  // Because this is an Update form we need to implement the payment form directly.
+  module_load_include('inc', 'commerce_payment', 'includes/commerce_payment.credit_card');
+  $form += commerce_payment_credit_card_form($fields, $card);
+
+  // Disable the card number field.
+  $form['credit_card']['number']['#disabled'] = TRUE;
+
+  $payment_method = commerce_payment_method_instance_load($card_data->instance_id);
+  $stored_cards = commerce_cardonfile_load_multiple_by_uid($account->uid, $payment_method['instance_id']);
+  $valid_cards = array();
+
+  // If have stored cards ...
+  if (!empty($stored_cards)) {
+    $valid_cards = array_filter($stored_cards, 'commerce_cardonfile_validate_card_expiration');
+  }
+
+  $card_count = count($valid_cards);
+  $form['credit_card']['cardonfile_instance_default'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Use as default card for payments with %method', array('%method' => $payment_method['display_title'])),
+    '#default_value' => empty($valid_cards) && $card_count == 1 ? TRUE : $card_data->instance_default,
+    '#disabled' => empty($valid_cards) && $card_count == 1 ? TRUE : $card_data->instance_default,
+  );
+
+  $wrapper = entity_metadata_wrapper('commerce_cardonfile', $card_data);
+
+  // Tweak the form to remove the fieldset from the address field if there
+  // is only one on this profile.
+  $addressfields = array();
+  $langcode = LANGUAGE_NONE;
+
+  foreach (commerce_info_fields('addressfield', 'commerce_customer_profile') as $field_name => $field) {
+    if (!empty($form[$field_name]['#language'])) {
+      $langcode = $form[$field_name]['#language'];
+
+      // Only consider this addressfield if it's represented on the form.
+      if (!empty($form[$field_name][$langcode])) {
+        $addressfields[] = array($field_name, $langcode);
+      }
+    }
+  }
+
+  // Load the billing profile associated with this card and populate the address form.
+  if (!empty($wrapper->commerce_cardonfile_profile->value())) {
+    $profile = $wrapper->commerce_cardonfile_profile->value();
+  }
+  else {
+    $profile = commerce_customer_profile_new('billing', $account->uid);
+
+    // Prepare an addressfield array to set to the customer profile.
+    $field = field_info_field('commerce_customer_address');
+    $instance = field_info_instance('commerce_customer_profile', 'commerce_customer_address', 'billing');
+    $address = addressfield_default_values($field, $instance);
+    $profile->commerce_customer_address[$langcode][] = $address;
+  }
+
+  // Add the entity context of the current cart order.
+  $profile->entity_context = array(
+    'entity_type' => 'commerce_cardonfile',
+    'entity_id' => $card_data->card_id,
+  );
+
+  $form['commerce_customer_profile'] = array(
+    '#type' => 'value',
+    '#value' => $profile,
+  );
+
+  // Add the field widgets for the profile.
+  field_attach_form('commerce_customer_profile', $profile, $form, $form_state);
+
+  // Add a validation callback so that we can call field_attach functions.
+  $form['#validate'][] = 'commerce_stripe_cardonfile_update_validate';
+
+  // Check to ensure only one addressfield was found on the form.
+  if (count($addressfields) == 1) {
+    list($field_name, $langcode) = array_shift($addressfields);
+
+    foreach (element_children($form['address'][$field_name][$langcode]) as $delta) {
+      // Don't mess with the "Add another item" button that could be present.
+      if ($form[$field_name][$langcode][$delta]['#type'] != 'submit') {
+        $form[$field_name][$langcode][$delta]['#type'] = 'container';
+      }
+    }
+  }
+
+  commerce_stripe_set_addressfield_class_names($form[$field_name][$langcode][0]);
+
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Update card')
+  );
+
+  return $form;
+}
+
+function commerce_stripe_cardonfile_update_validate($form, &$form_state) {
+  $profile = NULL;
+  if (!empty($form_state['values']['commerce_customer_profile'])) {
+    $profile = $form_state['values']['commerce_customer_profile'];
+  }
+  field_attach_form_validate('commerce_customer_profile', $profile, $form, $form_state);
+}
+
+function commerce_stripe_cardonfile_update_form_submit($form, &$form_state) {
+  $card_data = $form_state['card_data'];
+  $payment_method = commerce_payment_method_instance_load($card_data->instance_id);
+  commerce_stripe_cardonfile_update($form, $form_state, $payment_method, $card_data);
+  $form_state['redirect'] = 'user/' . $card_data->uid . '/cards';
 }
 
 /**
