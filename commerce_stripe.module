@@ -637,7 +637,7 @@ function _commerce_stripe_commerce_payment_transaction_save($transaction) {
   }
 }
 
-function _commerce_stripe_create_card($stripe_token, $account, $payment_method) {
+function _commerce_stripe_create_card($stripe_token, $account, $payment_method, $throw_exceptions = FALSE) {
   if (!commerce_stripe_load_library()) {
     return FALSE;
   }
@@ -663,6 +663,11 @@ function _commerce_stripe_create_card($stripe_token, $account, $payment_method) 
     catch (Exception $e) {
       drupal_set_message(t('We received the following error processing your card: %error. Please enter your information again or try a different card.', array('%error' => $e->getMessage())), 'error');
       watchdog('commerce_stripe', 'Following error received when creating Stripe customer: @stripe_error.', array('@stripe_error' => $e->getMessage()), WATCHDOG_NOTICE);
+
+      // If exceptions were received, and we're configured to throw them, do so.
+      if ($throw_exceptions) {
+        throw $e;
+      }
       return FALSE;
     }
   }
