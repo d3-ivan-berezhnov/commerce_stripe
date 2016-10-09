@@ -502,7 +502,9 @@ function commerce_stripe_submit_form_submit($payment_method, $pane_form, $pane_v
   // If instructed to do so, try using the specified card on file.
   if (module_exists('commerce_cardonfile') && !empty($payment_method['settings']['cardonfile']) &&
     !empty($pane_values['cardonfile']) && $pane_values['cardonfile'] !== 'new') {
+
     $card_data = commerce_cardonfile_load($pane_values['cardonfile']);
+
     if (empty($card_data) || $card_data->status == 0) {
       drupal_set_message(t('The requested card on file is no longer valid.'), 'error');
       return FALSE;
@@ -607,7 +609,15 @@ function commerce_stripe_submit_form_submit($payment_method, $pane_form, $pane_v
 
   // If so instructed by the customer, save the card.
   if (!empty($save_card)) {
-    _commerce_stripe_save_cardonfile($response->source, $order->uid, $payment_method, $pane_values['cardonfile_instance_default']);
+    $profile = NULL;
+
+    if (!empty($order->commerce_customer_billing)) {
+      $order_wrapper = entity_metadata_wrapper('commerce_order', $order);
+      // Get the billing profile in use and associate it with the card
+      $profile = $order_wrapper->commerce_customer_billing->value();
+    }
+
+    _commerce_stripe_save_cardonfile($response->source, $order->uid, $payment_method, $pane_values['cardonfile_instance_default'], $profile);
   }
 }
 
@@ -625,30 +635,26 @@ function _commerce_stripe_commerce_payment_transaction_save($transaction) {
   }
 }
 
-function _commerce_stripe_create_card($stripe_token, $uid, $payment_method) {
+function _commerce_stripe_create_card($stripe_token, $account, $payment_method) {
   if (!commerce_stripe_load_library()) {
     return FALSE;
   }
-  Stripe\Stripe::setApiKey($payment_method['settings']['secret_key']);
+  _commerce_stripe_set_api_key($payment_method);
 
   // If there is no existing customer id, use the Stripe form token to create one.
-  $stripe_customer_id = commerce_stripe_customer_id($uid, $payment_method['instance_id']);
+  $stripe_customer_id = commerce_stripe_customer_id($account->uid, $payment_method['instance_id']);
 
   if (!$stripe_customer_id) {
-    $account = user_load($uid);
     try {
       $customer = Stripe\Customer::create(array(
-        'card' => $stripe_token,
         'email' => $account->mail,
         'description' => t('Customer for :mail', array(':mail' => $account->mail)),
         'source' => $stripe_token,
       ));
-      $cards = Stripe\Customer::retrieve($customer->id)->sources->all(array(
-        'object' => 'card',
-      ));
 
+      $cards = Stripe\Customer::retrieve($customer->id)->sources->all(array('object' => 'card'));
       $cards_array = Stripe\Util\Util::convertStripeObjectToArray(array($cards));
-      // @todo current\default card      foreach ($cards_array[0]['data'] as $card) {
+      foreach ($cards_array[0]['data'] as $card) {
         return (object)$card;
       }
     }
@@ -1287,6 +1293,7 @@ function commerce_stripe_cardonfile_update($form, &$form_state, $payment_method,
     $card->exp_month = $card_data->card_exp_month;
     $card->exp_year = $card_data->card_exp_year;
     $card->name = $card_data->card_name;
+    $card->save();
 
     // Update the associated billing address and associate it with the card on file.
     $billing_profile = NULL;
