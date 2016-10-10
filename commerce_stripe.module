@@ -678,8 +678,6 @@ function _commerce_stripe_create_card($stripe_token, $account, $payment_method, 
     catch (Exception $e) {
       drupal_set_message(t('We received the following error processing your card: %error. Please enter your information again or try a different card.', array('%error' => $e->getMessage())), 'error');
       watchdog('commerce_stripe', 'Following error received when creating Stripe customer: @stripe_error.', array('@stripe_error' => $e->getMessage()), WATCHDOG_NOTICE);
-
-      // If exceptions were received, and we're configured to throw them, do so.
       if ($throw_exceptions) {
         throw $e;
       }
@@ -830,6 +828,13 @@ function commerce_stripe_cardonfile_charge($payment_method, $card_data, $order, 
   // Build a default description and offer modules the possibility to alter it.
   $description = t('Order Number: @order_number', array('@order_number' => $order->order_number));
 
+  if(isset($charge['currency_code'])){
+    $currency_code = $charge['currency_code'];
+  }
+  else {
+    $currency_code = $payment_method['settings']['stripe_currency'];
+  }
+
   $c = array(
     'amount' => $charge['amount'],
     'currency' => $currency_code,
@@ -939,12 +944,10 @@ function commerce_stripe_cardonfile_create_form($form, &$form_state, $op, $card_
 
   $stored_cards = commerce_cardonfile_load_multiple_by_uid($account->uid, $payment_method['instance_id']);
 
-  // Check for stored cards.
   if (!empty($stored_cards)) {
     $valid_cards = array_filter($stored_cards, 'commerce_cardonfile_validate_card_expiration');
   }
 
-  // Depending on if the user has other valid cards, we give them the option to set a default.
   $form['credit_card']['cardonfile_instance_default'] = array(
     '#type' => 'checkbox',
     '#title' => t('Use as default card for payments with %method', array('%method' => $payment_method['display_title'])),
