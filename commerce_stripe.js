@@ -130,24 +130,24 @@
               };
 
               var responseHandler = makeResponseHandler(
-                $("#edit-continue").closest("form"),
-                $('div.payment-errors'),
-                function (form$) {
-                  // Enable the submit button to allow resubmission.
-                  form$.find('.checkout-continue').removeAttr("disabled").removeClass("auth-processing");
-                  submitButtons$.removeAttr('disabled').removeClass('auth-processing');
-                  // Hide progress animated gif.
-                  $('.checkout-processing').hide();
-                },
-                function (form$) {
-                  var $btnTrigger = $('.form-submit.auth-processing').eq(0);
-                  var trigger$ = $("<input type='hidden' />").attr('name', $btnTrigger.attr('name')).attr('value', $btnTrigger.attr('value'));
-                  form$.append(trigger$);
-                }
+                  $("#edit-continue").closest("form"),
+                  $('div.payment-errors'),
+                  function (form$) {
+                    // Enable the submit button to allow resubmission.
+                    form$.find('.checkout-continue').removeAttr("disabled").removeClass("auth-processing");
+                    submitButtons$.removeAttr('disabled').removeClass('auth-processing');
+                    // Hide progress animated gif.
+                    $('.checkout-processing').hide();
+                  },
+                  function (form$) {
+                    var $btnTrigger = $('.form-submit.auth-processing').eq(0);
+                    var trigger$ = $("<input type='hidden' />").attr('name', $btnTrigger.attr('name')).attr('value', $btnTrigger.attr('value'));
+                    form$.append(trigger$);
+                  }
               );
 
               createToken(cardFields, responseHandler);
-	    }
+            }
             else if (settings.stripe.integration_type == 'checkout') {
               var token_created = false;
               var handler = StripeCheckout.configure({

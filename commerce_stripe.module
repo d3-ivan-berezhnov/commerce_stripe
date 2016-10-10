@@ -444,6 +444,7 @@ function commerce_stripe_submit_form($payment_method, $pane_values, $checkout_pa
       }
     }
 
+    // @todo: Add a customer if we have one.
     $checkout_settings += array(
       'currency' => $payment_method['settings']['stripe_currency'],
       'email' => $order->mail,
@@ -603,7 +604,7 @@ function commerce_stripe_submit_form_submit($payment_method, $pane_form, $pane_v
   catch (Exception $e) {
     drupal_set_message(t('We received the following error processing your card: :error
      Please enter your information again or try a different card.',
-      array(':error' => check_plain($e->getMessage()))), 'error');
+      array(':error' => $e->getMessage())), 'error');
     watchdog('commerce_stripe', 'Following error received when processing card @stripe_error.',
       array('@stripe_error' => $e->getMessage()), WATCHDOG_NOTICE);
     $transaction->remote_id = $e->getHttpStatus();
