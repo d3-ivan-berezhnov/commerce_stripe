@@ -42,10 +42,11 @@ function commerce_stripe_libraries_info() {
       'dependencies' => array(),
       'version arguments' => array(
         'file' => 'VERSION',
-        'pattern' => '/(\d+\.\d+\.\d+)/',
+        'pattern' => '/(3.\d+(\.\d+)?)/',
       ),
       'files' => array(
         'php' => array(
+          'lib/init.php',
           'lib/Stripe.php',
           'lib/Error/Base.php',
           'lib/Error/InvalidRequest.php',
