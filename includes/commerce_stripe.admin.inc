@@ -23,8 +23,8 @@ function commerce_stripe_refund_form($form, &$form_state, $order, $transaction) 
 
   // Make sure we can load the original charge object.
   try {
-    Stripe::setApiKey($payment_method['settings']['secret_key']);
-    $charge = Stripe_Charge::retrieve($transaction->remote_id);
+    \Stripe\Stripe::setApiKey(trim($payment_method['settings']['secret_key']));
+    $charge = Stripe\Charge::retrieve($transaction->remote_id);
     $form_state['stripe_charge'] = $charge;
   }
   catch (Exception $e) {
@@ -108,70 +108,62 @@ function commerce_stripe_refund_form_submit($form, &$form_state) {
 
   // Create the refund object.
   $data = array(
+    'charge' => $transaction->remote_id,
     'amount' => commerce_currency_decimal_to_amount($form_state['values']['amount'], $transaction->currency_code),
     'reason' => $form_state['values']['reason'],
   );
 
   try {
-    Stripe::setApiKey($payment_method['settings']['secret_key']);
-    $charge = Stripe_Charge::retrieve($transaction->remote_id);
-    $refund = $charge->refunds->create($data);
+    Stripe\Stripe::setApiKey(trim($payment_method['settings']['secret_key']));
+    $refund = Stripe\Refund::create($data);
+
+    if (is_object($refund)) {
+      // Copy the refund object into our own payload so we don't save API keys
+      // included in the response object.
+      $payload = array(
+        'id' => $refund->id,
+        'amount' => $refund->amount,
+        'currency' => $refund->currency,
+        'created' => $refund->created,
+        'object' => $refund->object,
+        'balance_transaction' => $refund->balance_transaction,
+        'charge' => $refund->charge,
+        'receipt_number' => $refund->receipt_number,
+        'reason' => $refund->reason,
+      );
+
+      // Create the new commerce payment transation and set appropriate values.
+      $refund_transaction = commerce_payment_transaction_new($transaction->payment_method, $order->order_id);
+      $refund_transaction->instance_id = $payment_method['instance_id'];
+      $refund_transaction->payload[REQUEST_TIME] = print_r($payload, TRUE);
+      $refund_transaction->status = COMMERCE_PAYMENT_STATUS_SUCCESS;
+      $refund_transaction->remote_id = $refund->id;
+      $refund_transaction->message = t('Refund issued.');
+
+      // Save data on the initial charge and flag this transaction as a refund.
+      $refund_transaction->data = array(
+        'stripe' => array(
+          'stripe_charge' => array(
+            'id' => $refund->id,
+            'balance_transaction' => $refund->balance_transaction,
+            'amount_refunded' => $refund->amount,
+          ),
+          'stripe_refund' => TRUE,
+        ),
+      );
+
+      // Save the amount as a negative integer.
+      $refund_transaction->amount = $refund->amount * -1;
+      $refund_transaction->currency_code = strtoupper($refund->currency);
+      commerce_payment_transaction_save($refund_transaction);
+
+      // Inform the user of the success and redirect them back to payments.
+      drupal_set_message(t('Refund processed successfully'));
+      $form_state['redirect'] = 'admin/commerce/orders/' . $order->order_id . '/payment';
+    }
   }
   catch (Exception $e) {
-    drupal_set_message(t('The transaction could not be refunded. The error was: @error', array('@error' => $e->getMessage())), 'error');
+    drupal_set_message(t('The transaction could not be refunded. The error was: @error',
+      array('@error' => $e->getMessage())), 'error');
   }
-
-  if (is_object($refund)) {
-    // Copy the refund object into our own payload so we don't save API keys
-    // included in the response object.
-    $payload = array(
-      'id' => $refund->id,
-      'amount' => $refund->amount,
-      'currency' => $refund->currency,
-      'created' => $refund->created,
-      'object' => $refund->object,
-      'balance_transaction' => $refund->balance_transaction,
-      'charge' => $refund->charge,
-      'receipt_number' => $refund->receipt_number,
-      'reason' => $refund->reason,
-    );
-
-    // Create the new commerce payment transation and set appropriate values.
-    $refund_transaction = commerce_payment_transaction_new($transaction->payment_method, $order->order_id);
-    $refund_transaction->instance_id = $payment_method['instance_id'];
-    $refund_transaction->payload[REQUEST_TIME] = print_r($payload, TRUE);
-    $refund_transaction->status = COMMERCE_PAYMENT_STATUS_SUCCESS;
-    $refund_transaction->remote_id = $refund->id;
-    $refund_transaction->message = t('Refund issued.');
-
-    // Save data on the initial charge and flag this transaction as a refund.
-    $refund_transaction->data = array(
-      'stripe' => array(
-        'stripe_charge' => array(
-          'id' => $refund->id,
-          'balance_transaction' => $refund->balance_transaction,
-          'amount_refunded' => $refund->amount,
-        ),
-        'stripe_refund' => TRUE,
-      ),
-    );
-
-    // Save the amount as a negative integer.
-    $refund_transaction->amount = $refund->amount * -1;
-    $refund_transaction->currency_code = strtoupper($refund->currency);
-    commerce_payment_transaction_save($refund_transaction);
-
-    // Inform the user of the success and redirect them back to payments.
-    drupal_set_message(t('Refund processed successfully'));
-    $form_state['redirect'] = 'admin/commerce/orders/' . $order->order_id . '/payment';
-    return;
-  }
-
-  // Inform the user that the refund was not successful.
-  $mesasge = 'The payment transaction could not be refunded. Failure information, if provided is: @failure_code @failure_message';
-  $message_variables = array(
-    '@failure_code' => !empty($refund->failure_code) ? $refund->failure_code : NULL,
-    '@failure_message' => !empty($refund->failure_message) ? $refund->failure_message : NULL,
-  );
-  drupal_set_message(t($message, $message_variables), 'error');
 }
