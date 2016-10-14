@@ -119,7 +119,7 @@ function commerce_stripe_commerce_payment_method_info() {
     'display_title' => t('Credit card'),
     'description' => t('Stripe payment gateway'),
     'active' => FALSE,
-    'terminal' => FALSE,
+    'terminal' => TRUE,
     'offsite' => FALSE,
   );
 
@@ -315,7 +315,7 @@ function commerce_stripe_settings_form($settings) {
   else {
     $form['cardonfile'] = array(
       '#type' => 'markup',
-      '#markup' => t('To enable Card on File funcitionality download and install the Card on File module.'),
+      '#markup' => t('To enable Card on File functionality, download and install the Commerce Card on File module.'),
     );
   }
 
@@ -371,7 +371,7 @@ function _commerce_stripe_credit_card_form() {
 }
 
 /**
- * Payment method callback: checkout form.
+ * Payment method callback: checkout and terminal form.
  */
 function commerce_stripe_submit_form($payment_method, $pane_values, $checkout_pane, $order) {
   $integration_type = !empty($payment_method['settings']['integration_type']) ? $payment_method['settings']['integration_type'] : STRIPE_DEFAULT_INTEGRATION;
@@ -404,15 +404,7 @@ function commerce_stripe_submit_form($payment_method, $pane_values, $checkout_pa
   );
   drupal_add_js(array('commerce_stripe_address' => $address), array('type' => 'setting'));
 
-  // Differentiate form elements based on stripe integration type.
-  if ($integration_type == 'stripejs') {
-    // @todo: Use _commerce_stripe_form_add_credit_card_form().
-    $form = _commerce_stripe_credit_card_form();
-
-    // Include the stripe.js from stripe.com.
-    drupal_add_js('https://js.stripe.com/v2/', 'external');
-  }
-  elseif ($integration_type == 'checkout') {
+  if ($integration_type == 'checkout' && isset($checkout_pane)) {
     $form = array();
 
     // Add pay button.
@@ -455,6 +447,11 @@ function commerce_stripe_submit_form($payment_method, $pane_values, $checkout_pa
 
     // Add external checkout.js library.
     drupal_add_js('https://checkout.stripe.com/checkout.js', 'external');
+  }
+  else {
+    $form = _commerce_stripe_credit_card_form();
+    // Include the stripe.js from stripe.com.
+    drupal_add_js('https://js.stripe.com/v2/', 'external');
   }
 
   // @todo: Use _commerce_stripe_form_configure_stripe_common().
@@ -1524,4 +1521,26 @@ function commerce_stripe_commerce_stripe_metadata($order) {
 // @todo: Use with a global config we can programmatically change (via Rules etc.)
 function _commerce_stripe_set_api_key($payment_method) {
   Stripe\Stripe::setApiKey(trim($payment_method['settings']['secret_key']));
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ *
+ * Make sure the terminal form is aware of Stripe.
+ */
+function commerce_stripe_form_commerce_payment_order_transaction_add_form_alter(&$form, &$form_state, $form_id) {
+  if (!empty($form['payment_terminal']) && isset($form_state['payment_method']['method_id']) &&
+    $form_state['payment_method']['method_id'] == 'commerce_stripe') {
+
+    // Do not trigger Stripe Javascript for Card on File payments.
+    if (isset($form['payment_terminal']['payment_details']['credit_card']['#access']) &&
+      $form['payment_terminal']['payment_details']['credit_card']['#access'] === FALSE) {
+      return;
+    }
+
+    $form['payment_terminal']['commerce_stripe_terminal'] = array(
+      '#value' => 1,
+      '#type' => 'hidden',
+    );
+  }
 }
