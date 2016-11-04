@@ -6,7 +6,7 @@
 (function ($) {
   Drupal.behaviors.stripe = {
     attach: function (context, settings) {
-      if (settings.stripe.fetched == null) {
+      if (typeof settings.stripe.fetched == 'undefined') {
         settings.stripe.fetched = true;
 
         // Clear the token every time the payment form is loaded. We only need the token
