@@ -1151,7 +1151,7 @@ function commerce_stripe_cardonfile_update_form($form, &$form_state, $op, $card_
   }
 
   // Load the billing profile associated with this card and populate the address form.
-  if ($wrapper->__isset('commerce_cardonfile_profile') && !empty($wrapper->commerce_cardonfile_profile->value())) {
+  if ($wrapper->__isset('commerce_cardonfile_profile') && !empty($wrapper->commerce_cardonfile_profile)) {
     $profile = $wrapper->commerce_cardonfile_profile->value();
   }
   else {
