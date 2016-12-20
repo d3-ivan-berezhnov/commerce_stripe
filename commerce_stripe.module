@@ -1,0 +1,13 @@
+<?php
+
+/**
+ * Custom process callback to remove name attribute from stripejs form fields.
+ * @param array $element
+ * @param array $form_state
+ * @param array $form
+ * @return array $element
+ */
+function commerce_stripe_field_remove_name(&$element, $form_state, $form) {
+  unset($element['#name']);
+  return $element;
+}

@@ -1,0 +1,22 @@
+stripe:
+  remote: https://github.com/stripe/stripe-php
+  version: "4.3.0"
+  license:
+    name: MIT
+    url: https://github.com/stripe/stripe-php/blob/master/LICENSE
+    gpl-compatible: true
+  js:
+    "https://js.stripe.com/v2/": { minified: true }
+
+form:
+  version: VERSION
+  css:
+    theme:
+      css/commerce_stripe.form.css: {}
+  js:
+    js/commerce_stripe.form.js: {}
+  dependencies:
+    - core/jquery
+    - core/drupal
+    - core/jquery.once
+    - commerce_stripe/stripe

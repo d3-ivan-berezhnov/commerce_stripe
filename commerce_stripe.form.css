@@ -1,0 +1,28 @@
+#edit-payment-information-add-payment-method-payment-details-stripe-number {
+  width: 16em;
+  margin-top: 10px;
+  margin-right: 10px;
+}
+
+#edit-payment-information-add-payment-method-payment-details-stripe-cvc {
+  margin-top: 10px;
+  width: 82px;
+}
+
+.credit-card-form__expiration {
+  margin-top: 10px;
+  margin-right: 10px;
+  margin-bottom: 1em;
+}
+
+#expiration-month {
+  width: 3em;
+}
+
+#expiration-year {
+  width: 3em;
+}
+
+#cvv {
+  width: 5em;
+}
