@@ -796,20 +796,13 @@ function commerce_stripe_cardonfile_charge($payment_method, $card_data, $order, 
   // Fetch the customer id and card id from $card_data->remote_id
   list($customer_id, $card_id) = explode('|', $card_data->remote_id);
 
-  if(isset($charge['currency_code'])){
-    $currency_code = $charge['currency_code'];
-  }
-  else {
-    $currency_code = $payment_method['settings']['stripe_currency'];
-  }
-
   // Assemble charge parameters.
   _commerce_stripe_set_api_key($payment_method);
 
   // Build a default description and offer modules the possibility to alter it.
   $description = t('Order Number: @order_number', array('@order_number' => $order->order_number));
 
-  if(isset($charge['currency_code'])){
+  if (isset($charge['currency_code'])) {
     $currency_code = $charge['currency_code'];
   }
   else {
