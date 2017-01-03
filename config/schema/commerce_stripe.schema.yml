@@ -13,6 +13,3 @@ commerce_payment.commerce_payment_gateway.plugin.stripe_gateway:
     publishable_key:
       type: string
       label: 'Publishable key (Live)'
-    integration_type:
-      type: string
-      label: 'Integration_type (Live)'

@@ -40,8 +40,6 @@ class StripeGateway extends OnsitePaymentGatewayBase implements StripeGatewayInt
    */
   protected $api;
 
-  public $mode;
-
   /**
    * {@inheritdoc}
    */
@@ -49,7 +47,6 @@ class StripeGateway extends OnsitePaymentGatewayBase implements StripeGatewayInt
     parent::__construct($configuration, $plugin_id, $plugin_definition, $entity_type_manager, $payment_type_manager, $payment_method_type_manager);
     $key = ($this->getMode() == 'test') ? $this->configuration['secret_key_test'] : $this->configuration['secret_key'];
     $this->api = \Stripe\Stripe::setApiKey($key);
-    $this->mode = $this->getStripeMode();
     $this->publishableKey = $this->getStripePublishableKey();
 
   }
@@ -86,13 +83,6 @@ class StripeGateway extends OnsitePaymentGatewayBase implements StripeGatewayInt
   /**
    * {@inheritdoc}
    */
-  public function getStripeMode() {
-    return $this->configuration['integration_type'];
-  }
-
-  /**
-   * {@inheritdoc}
-   */
   public function getStripePublishableKey() {
     return $key = ($this->getMode() == 'test') ? $this->configuration['publishable_key_test'] : $this->configuration['publishable_key'];
   }
@@ -106,7 +96,6 @@ class StripeGateway extends OnsitePaymentGatewayBase implements StripeGatewayInt
       'publishable_key_test' => '',
       'secret_key' => '',
       'publishable_key' => '',
-      'integration_type' => 'stripejs',
     ] + parent::defaultConfiguration();
   }
 
@@ -144,15 +133,6 @@ class StripeGateway extends OnsitePaymentGatewayBase implements StripeGatewayInt
       '#required' => TRUE,
     ];
 
-    $form['integration_type'] = [
-      '#type' => 'select',
-      '#title' => $this->t('Integration_type'),
-      '#options' => ['stripejs' => 'Stripe JS'],
-      '#description' => $this->t('Choose Stripe integration method: Stripe.js makes it easy to collect credit card (and other similarly sensitive) details without having the information touch your server.  Checkout is an embeddable iframe for desktop, tablet, and mobile devices. For now we only support stripe.js.'),
-      '#default_value' => $this->configuration['integration_type'],
-      '#required' => TRUE,
-    ];
-
     return $form;
   }
 
@@ -168,7 +148,6 @@ class StripeGateway extends OnsitePaymentGatewayBase implements StripeGatewayInt
       $this->configuration['publishable_key_test'] = $values['publishable_key_test'];
       $this->configuration['secret_key'] = $values['secret_key'];
       $this->configuration['publishable_key'] = $values['publishable_key'];
-      $this->configuration['integration_type'] = $values['integration_type'];
     }
   }
 
