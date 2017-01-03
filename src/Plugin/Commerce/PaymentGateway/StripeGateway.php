@@ -415,13 +415,12 @@ class StripeGateway extends OnsitePaymentGatewayBase implements StripeGatewayInt
    *   The Commerce credit card type.
    */
   protected function mapCreditCardType($card_type) {
+    // https://support.stripe.com/questions/which-cards-and-payment-types-can-i-accept-with-stripe.
     $map = [
       'American Express' => 'amex',
-      'China UnionPay' => 'unionpay',
       'Diners Club' => 'dinersclub',
       'Discover' => 'discover',
       'JCB' => 'jcb',
-      'Maestro' => 'maestro',
       'MasterCard' => 'mastercard',
       'Visa' => 'visa',
     ];
