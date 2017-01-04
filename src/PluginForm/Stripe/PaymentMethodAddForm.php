@@ -1,6 +1,6 @@
 <?php
 
-namespace Drupal\commerce_stripe\PluginForm\StripeGateway;
+namespace Drupal\commerce_stripe\PluginForm\Stripe;
 
 use Drupal\commerce_payment\PluginForm\PaymentMethodAddForm as BasePaymentMethodAddForm;
 use Drupal\Core\Form\FormStateInterface;
@@ -11,7 +11,7 @@ class PaymentMethodAddForm extends BasePaymentMethodAddForm {
    * {@inheritdoc}
    */
   public function buildCreditCardForm(array $element, FormStateInterface $form_state) {
-    /** @var \Drupal\commerce_stripe\Plugin\Commerce\PaymentGateway\StripeGatewayInterface $plugin */
+    /** @var \Drupal\commerce_stripe\Plugin\Commerce\PaymentGateway\StripeInterface $plugin */
 
     $plugin = $this->plugin;
 
@@ -32,7 +32,6 @@ class PaymentMethodAddForm extends BasePaymentMethodAddForm {
       '#type' => 'textfield',
       '#title' => t('Card number'),
       '#size' => 20,
-      '#default_value' => 4242424242424242,
       '#attributes' => [
         'data-stripe' => 'number'
       ],
@@ -55,7 +54,6 @@ class PaymentMethodAddForm extends BasePaymentMethodAddForm {
       '#type' => 'textfield',
       '#title' => t('Exp month'),
       '#size' => 2,
-      '#default_value' => 01,
       '#attributes' => [
         'data-stripe' => 'exp_month'
       ],
@@ -72,7 +70,6 @@ class PaymentMethodAddForm extends BasePaymentMethodAddForm {
       '#type' => 'textfield',
       '#title' => t('Exp year'),
       '#size' => 2,
-      '#default_value' => 18,
       '#attributes' => [
         'data-stripe' => 'exp_year'
       ],
@@ -86,7 +83,6 @@ class PaymentMethodAddForm extends BasePaymentMethodAddForm {
       '#type' => 'textfield',
       '#title' => t('CVC'),
       '#size' => 4,
-      '#default_value' => 111,
       '#attributes' => [
         'data-stripe' => 'cvc'
       ],

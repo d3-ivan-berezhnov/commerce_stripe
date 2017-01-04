@@ -23,7 +23,7 @@ use Drupal\Core\Form\FormStateInterface;
  *   label = "Stripe",
  *   display_label = "Stripe",
  *   forms = {
- *     "add-payment-method" = "Drupal\commerce_stripe\PluginForm\StripeGateway\PaymentMethodAddForm",
+ *     "add-payment-method" = "Drupal\commerce_stripe\PluginForm\Stripe\PaymentMethodAddForm",
  *   },
  *   payment_method_types = {"credit_card"},
  *   credit_card_types = {
@@ -31,7 +31,7 @@ use Drupal\Core\Form\FormStateInterface;
  *   },
  * )
  */
-class StripeGateway extends OnsitePaymentGatewayBase implements StripeGatewayInterface {
+class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
 
   /**
    * The Stripe gateway used for making API calls.
