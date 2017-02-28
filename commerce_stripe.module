@@ -675,6 +675,9 @@ function _commerce_stripe_create_card($stripe_token, $account, $payment_method, 
     catch (Exception $e) {
       drupal_set_message(t('We received the following error processing your card: %error. Please enter your information again or try a different card.', array('%error' => $e->getMessage())), 'error');
       watchdog('commerce_stripe', 'Following error received when adding a card to customer: @stripe_error.', array('@stripe_error' => $e->getMessage()), WATCHDOG_NOTICE);
+      if ($throw_exceptions) {
+        throw $e;
+      }
       return FALSE;
     }
   }
