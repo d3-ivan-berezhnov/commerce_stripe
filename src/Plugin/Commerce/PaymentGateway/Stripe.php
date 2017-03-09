@@ -139,6 +139,37 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
   /**
    * {@inheritdoc}
    */
+  public function validateConfigurationForm(array &$form, FormStateInterface $form_state) {
+    parent::validateConfigurationForm($form, $form_state);
+
+    if (!$form_state->getErrors()) {
+      $values = $form_state->getValue($form['#parents']);
+
+      // Validate test keys.
+      try {
+        \Stripe\Stripe::setApiKey($values['secret_key_test']);
+        \Stripe\Balance::retrieve();
+      }
+      catch (\Stripe\Error\Base $e) {
+        $form_state->setError($form['secret_key_test'], $this->t('Invalid Secret key (test).'));
+      }
+
+      // Validate live keys.
+      try {
+        \Stripe\Stripe::setApiKey($values['secret_key']);
+        \Stripe\Balance::retrieve();
+      }
+      catch (\Stripe\Error\Base $e) {
+        $form_state->setError($form['secret_key'], $this->t('Invalid Secret key (live).'));
+      }
+
+      // @todo: Publishable keys validation, if possible.
+    }
+  }
+
+  /**
+   * {@inheritdoc}
+   */
   public function submitConfigurationForm(array &$form, FormStateInterface $form_state) {
     parent::submitConfigurationForm($form, $form_state);
 
