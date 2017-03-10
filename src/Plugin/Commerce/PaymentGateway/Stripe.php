@@ -210,7 +210,9 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
 
     try {
       $result = \Stripe\Charge::create($transaction_data);
-    } catch (\Stripe\Exception $e) {
+      ErrorHelper::handleErrors($result);
+    }
+    catch (\Stripe\Error\Base $e) {
       ErrorHelper::handleException($e);
     }
 
@@ -243,7 +245,8 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
         'amount' => $this->formatNumber($decimal_amount),
       ];
       $charge->capture($transaction_data);
-    } catch (\Stripe\Exception $e) {
+    }
+    catch (\Stripe\Error\Base $e) {
       ErrorHelper::handleException($e);
     }
 
@@ -287,7 +290,8 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
         'amount' => $this->formatNumber($decimal_amount),
       ];
       $refund = \Stripe\Refund::create($data);
-    } catch (\Stripe\Exception $e) {
+    }
+    catch (\Stripe\Error\Base $e) {
       ErrorHelper::handleException($e);
     }
 
@@ -343,7 +347,8 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
         $customer = \Stripe\Customer::retrieve($customer_id);
         $customer->sources->retrieve($payment_method->getRemoteId())->delete();
       }
-    } catch (\Stripe\Exception $e) {
+    }
+    catch (\Stripe\Error\Base $e) {
       ErrorHelper::handleException($e);
     }
     // Delete the local entity.
@@ -380,9 +385,9 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
     if ($customer_id) {
       // If the customer id already exists, use the Stripe form token to create the new card.
       $customer = \Stripe\Customer::retrieve($customer_id);
+      // Create a payment method for an existing customer.
       $card = $customer->sources->create(['source' => $payment_details['stripe_token']]);
       return $card;
-      // Create a payment method for an existing customer.
     }
     else {
       // Create both the customer and the payment method.
@@ -400,8 +405,9 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
         foreach ($cards_array[0]['data'] as $card) {
           return $card;
         }
-      } catch (Exception $e) {
-
+      }
+      catch (\Stripe\Error\Base $e) {
+        ErrorHelper::handleException($e);
       }
     }
 

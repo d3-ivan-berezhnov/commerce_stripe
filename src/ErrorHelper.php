@@ -59,6 +59,10 @@ class ErrorHelper {
   /**
    * Translates Stripe errors into Commerce exceptions.
    *
+   * @todo
+   *   Make sure if this is really needed or handleException cover all
+   *   possible errors.
+   *
    * @param object $result
    *   The Stripe result object.
    *
@@ -66,26 +70,26 @@ class ErrorHelper {
    *   The Commerce exception.
    */
   public static function handleErrors($result) {
-    if ($result['_values']['status'] == 'succeeded') {
+    $result_data = $result->__toArray();
+    if ($result_data['status'] == 'succeeded') {
       return;
     }
-    $errors = $result->errors->deepAll();
-    if (!empty($errors)) {
+
+    // @todo: Better handling for possible Stripe errors.
+    if (!empty($result_data['failure_code'])) {
+      $failure_code = $result_data['failure_code'];
       // https://stripe.com/docs/api?lang=php#errors
       // Validation errors can be due to a module error (mapped to
       // InvalidRequestException) or due to a user input error (mapped to
       // a HardDeclineException).
-      $hard_decline_codes = [500, 502, 503, 504];
-      foreach($errors AS $error) {
-        if (in_array($error->code, $hard_decline_codes)) {
-          throw new HardDeclineException($error->message, $error->code);
-        }
-        else {
-          throw new InvalidRequestException($error->message, $error->code);
-        }
+      $hard_decline_codes = ['processing_error', 'missing', 'card_declined'];
+      if (in_array($failure_code, $hard_decline_codes)) {
+        throw new HardDeclineException($result_data['failure_message'], $failure_code);
+      }
+      else {
+        throw new InvalidRequestException($result_data['failure_message'], $failure_code);
       }
     }
-
   }
 
 }
