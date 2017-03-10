@@ -12,7 +12,6 @@ class PaymentMethodAddForm extends BasePaymentMethodAddForm {
    */
   public function buildCreditCardForm(array $element, FormStateInterface $form_state) {
     /** @var \Drupal\commerce_stripe\Plugin\Commerce\PaymentGateway\StripeInterface $plugin */
-
     $plugin = $this->plugin;
 
     // Set our key to settings array.

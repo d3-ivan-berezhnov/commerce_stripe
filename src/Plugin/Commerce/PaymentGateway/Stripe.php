@@ -34,21 +34,12 @@ use Drupal\Core\Form\FormStateInterface;
 class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
 
   /**
-   * The Stripe gateway used for making API calls.
-   *
-   * @var \Stripe\Gateway
-   */
-  protected $api;
-
-  /**
    * {@inheritdoc}
    */
   public function __construct(array $configuration, $plugin_id, $plugin_definition, EntityTypeManagerInterface $entity_type_manager, PaymentTypeManager $payment_type_manager, PaymentMethodTypeManager $payment_method_type_manager) {
     parent::__construct($configuration, $plugin_id, $plugin_definition, $entity_type_manager, $payment_type_manager, $payment_method_type_manager);
     $key = ($this->getMode() == 'test') ? $this->configuration['secret_key_test'] : $this->configuration['secret_key'];
-    $this->api = \Stripe\Stripe::setApiKey($key);
-    $this->publishableKey = $this->getStripePublishableKey();
-
+    $this->setApiKey($key);
   }
 
   /**
@@ -78,6 +69,13 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
     ];
 
     return $operations;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function setApiKey($secret_key) {
+    \Stripe\Stripe::setApiKey($secret_key);
   }
 
   /**
@@ -147,7 +145,7 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
 
       // Validate test keys.
       try {
-        \Stripe\Stripe::setApiKey($values['secret_key_test']);
+        $this->setApiKey($values['secret_key_test']);
         \Stripe\Balance::retrieve();
       }
       catch (\Stripe\Error\Base $e) {
@@ -156,7 +154,7 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
 
       // Validate live keys.
       try {
-        \Stripe\Stripe::setApiKey($values['secret_key']);
+        $this->setApiKey($values['secret_key']);
         \Stripe\Balance::retrieve();
       }
       catch (\Stripe\Error\Base $e) {
@@ -209,7 +207,6 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
       'source' => $payment_method->getRemoteId(),
       'capture' => $capture,
     ];
-
 
     try {
       $result = \Stripe\Charge::create($transaction_data);
@@ -373,8 +370,6 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
    */
   protected function doCreatePaymentMethod(PaymentMethodInterface $payment_method, array $payment_details) {
     $owner = $payment_method->getOwner();
-    /** @var \Drupal\address\AddressInterface $address */
-    $address = $payment_method->getBillingProfile()->address->first();
     $customer_id = NULL;
     $customer_data = [];
     if ($owner) {
@@ -410,9 +405,7 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
       }
     }
 
-    return [
-
-    ];
+    return [];
   }
 
   /**
@@ -456,7 +449,4 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
     return $amount;
   }
 
-
 }
-
-
