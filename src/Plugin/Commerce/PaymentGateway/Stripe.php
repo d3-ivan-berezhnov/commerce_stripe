@@ -398,7 +398,7 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
       try {
         $customer = \Stripe\Customer::create([
           'email' => $owner->getEmail(),
-          'description' => t('Customer for :mail', array(':mail' => $owner->getEmail())),
+          'description' => $this->t('Customer for :mail', array(':mail' => $owner->getEmail())),
           'source' => $payment_details['stripe_token'],
         ]);
         $cards = \Stripe\Customer::retrieve($customer->id)->sources->all(['object' => 'card']);
