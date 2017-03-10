@@ -38,8 +38,10 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
    */
   public function __construct(array $configuration, $plugin_id, $plugin_definition, EntityTypeManagerInterface $entity_type_manager, PaymentTypeManager $payment_type_manager, PaymentMethodTypeManager $payment_method_type_manager) {
     parent::__construct($configuration, $plugin_id, $plugin_definition, $entity_type_manager, $payment_type_manager, $payment_method_type_manager);
-    $key = ($this->getMode() == 'test') ? $this->configuration['secret_key_test'] : $this->configuration['secret_key'];
-    $this->setApiKey($key);
+    if ($this->configuration['secret_key_test']) {
+      $key = ($this->getMode() == 'test') ? $this->configuration['secret_key_test'] : $this->configuration['secret_key'];
+      $this->setApiKey($key);
+    }
   }
 
   /**
@@ -144,21 +146,23 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
       $values = $form_state->getValue($form['#parents']);
 
       // Validate test keys.
-      try {
-        $this->setApiKey($values['secret_key_test']);
-        \Stripe\Balance::retrieve();
-      }
-      catch (\Stripe\Error\Base $e) {
-        $form_state->setError($form['secret_key_test'], $this->t('Invalid Secret key (test).'));
+      if (!empty($values['secret_key_test'])) {
+        try {
+          $this->setApiKey($values['secret_key_test']);
+          \Stripe\Balance::retrieve();
+        } catch (\Stripe\Error\Base $e) {
+          $form_state->setError($form['secret_key_test'], $this->t('Invalid Secret key (test).'));
+        }
       }
 
       // Validate live keys.
-      try {
-        $this->setApiKey($values['secret_key']);
-        \Stripe\Balance::retrieve();
-      }
-      catch (\Stripe\Error\Base $e) {
-        $form_state->setError($form['secret_key'], $this->t('Invalid Secret key (live).'));
+      if (!empty($values['secret_key'])) {
+        try {
+          $this->setApiKey($values['secret_key']);
+          \Stripe\Balance::retrieve();
+        } catch (\Stripe\Error\Base $e) {
+          $form_state->setError($form['secret_key'], $this->t('Invalid Secret key (live).'));
+        }
       }
 
       // @todo: Publishable keys validation, if possible.
