@@ -121,7 +121,8 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
         try {
           $this->setApiKey($values['secret_key_test']);
           \Stripe\Balance::retrieve();
-        } catch (\Stripe\Error\Base $e) {
+        }
+        catch (\Stripe\Error\Base $e) {
           $form_state->setError($form['secret_key_test'], $this->t('Invalid Secret key (test).'));
         }
       }
@@ -131,7 +132,8 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
         try {
           $this->setApiKey($values['secret_key']);
           \Stripe\Balance::retrieve();
-        } catch (\Stripe\Error\Base $e) {
+        }
+        catch (\Stripe\Error\Base $e) {
           $form_state->setError($form['secret_key'], $this->t('Invalid Secret key (live).'));
         }
       }
@@ -286,6 +288,7 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
         'amount' => $this->formatNumber($decimal_amount),
       ];
       $refund = \Stripe\Refund::create($data);
+      ErrorHelper::handleErrors($refund);
     }
     catch (\Stripe\Error\Base $e) {
       ErrorHelper::handleException($e);
