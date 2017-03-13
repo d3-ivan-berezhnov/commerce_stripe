@@ -76,11 +76,11 @@ TROUBLESHOOTING
 MAINTAINERS
 -----------
 Current maintainers:
-* Scott Hooker (scotthooker) - https://www.drupal.org/u/scotthooker
 * Tavi Toporjinschi (vasike) - https://www.drupal.org/u/vasike
+* Scott Hooker (scotthooker) - https://www.drupal.org/u/scotthooker
 
 This project has been developed by:
-* Commerce Labs
+* TES Global
   TES Global is a digital education company that has been supporting educators
   for over 100 years. Our mission is to help teachers, schools and universities
   to develop and deliver the best education.
