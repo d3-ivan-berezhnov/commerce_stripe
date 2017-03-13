@@ -10,12 +10,10 @@ stripe:
 
 form:
   version: VERSION
-  css:
-    theme:
-      css/commerce_stripe.form.css: {}
   js:
     js/commerce_stripe.form.js: {}
   dependencies:
+    - classy/messages
     - core/jquery
     - core/drupal
     - core/jquery.once
