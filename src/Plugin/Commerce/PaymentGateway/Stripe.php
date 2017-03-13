@@ -47,35 +47,6 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
   /**
    * {@inheritdoc}
    */
-  public function buildPaymentOperations(PaymentInterface $payment) {
-    $operations = [];
-
-    $access = $payment->getState()->value == 'authorization';
-    $operations['capture'] = [
-      'title' => $this->t('Capture'),
-      'page_title' => $this->t('Capture payment'),
-      'plugin_form' => 'capture-payment',
-      'access' => $access,
-    ];
-
-    $access = in_array($payment->getState()->value, [
-      'capture_completed',
-      'capture_partially_refunded'
-    ]);
-
-    $operations['refund'] = [
-      'title' => $this->t('Refund'),
-      'page_title' => $this->t('Refund payment'),
-      'plugin_form' => 'refund-payment',
-      'access' => $access,
-    ];
-
-    return $operations;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
   public function setApiKey($secret_key) {
     \Stripe\Stripe::setApiKey($secret_key);
   }
@@ -264,7 +235,28 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
    * {@inheritdoc}
    */
   public function voidPayment(PaymentInterface $payment) {
+    if ($payment->getState()->value != 'authorization') {
+      throw new \InvalidArgumentException('Only payments in the "authorization" state can be voided.');
+    }
 
+    // Void Stripe payment - release uncaptured payment.
+    try {
+      $remote_id = $payment->getRemoteId();
+      $decimal_amount = $payment->getAmount()->getNumber();
+      $data = [
+        'charge' => $remote_id,
+        'amount' => $this->formatNumber($decimal_amount),
+      ];
+      $release_refund = \Stripe\Refund::create($data);
+      ErrorHelper::handleErrors($release_refund);
+    }
+    catch (\Stripe\Error\Base $e) {
+      ErrorHelper::handleException($e);
+    }
+
+    // Update payment.
+    $payment->state = 'authorization_voided';
+    $payment->save();
   }
 
   /**
