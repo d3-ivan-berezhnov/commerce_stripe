@@ -11,84 +11,32 @@ class PaymentMethodAddForm extends BasePaymentMethodAddForm {
    * {@inheritdoc}
    */
   public function buildCreditCardForm(array $element, FormStateInterface $form_state) {
-    /** @var \Drupal\commerce_stripe\Plugin\Commerce\PaymentGateway\StripeInterface $plugin */
-    $plugin = $this->plugin;
+    $element = parent::buildCreditCardForm($element, $form_state);
+
+    // Alter the form with Stripe specific needs.
+    $element['#attributes']['class'][] = 'stripe-form';
 
     // Set our key to settings array.
     $element['#attached']['library'][] = 'commerce_stripe/form';
+    /** @var \Drupal\commerce_stripe\Plugin\Commerce\PaymentGateway\StripeInterface $plugin */
+    $plugin = $this->plugin;
     $element['#attached']['drupalSettings']['commerceStripe'] = [
       'publishableKey' => $plugin->getStripePublishableKey(),
     ];
 
-    $element['#attributes']['class'][] = 'stripe-form';
-
+    // To display validation errors.
     $element['payment_errors'] = [
-      '#type' => 'item',
-      '#markup' => '<span class="payment-errors"></span>',
+      '#type' => 'markup',
+      '#markup' => '<div class="payment-errors"></div>',
+      '#weight' => -200,
     ];
 
-    $element['stripe_number'] = [
-      '#type' => 'textfield',
-      '#title' => t('Card number'),
-      '#size' => 20,
-      '#attributes' => [
-        'data-stripe' => 'number'
-      ],
-      '#process' => [
-        'commerce_stripe_field_remove_name'
-      ]
-    ];
-
-
-    $element['stripe_expiration'] = [
-      '#type' => 'container',
-      '#attributes' => [
-        'class' => ['credit-card-form__expiration'],
-      ],
-      '#process' => [
-        'commerce_stripe_field_remove_name'
-      ]
-    ];
-    $element['stripe_expiration']['month'] = [
-      '#type' => 'textfield',
-      '#title' => t('Exp month'),
-      '#size' => 2,
-      '#attributes' => [
-        'data-stripe' => 'exp_month'
-      ],
-      '#process' => [
-        'commerce_stripe_field_remove_name'
-      ]
-    ];
-    $element['stripe_expiration']['divider'] = [
-      '#type' => 'item',
-      '#title' => '',
-      '#markup' => '<span class="credit-card-form__divider">/</span>',
-    ];
-    $element['stripe_expiration']['year'] = [
-      '#type' => 'textfield',
-      '#title' => t('Exp year'),
-      '#size' => 2,
-      '#attributes' => [
-        'data-stripe' => 'exp_year'
-      ],
-      '#process' => [
-        'commerce_stripe_field_remove_name'
-      ]
-    ];
-
-
-    $element['stripe_cvc'] = [
-      '#type' => 'textfield',
-      '#title' => t('CVC'),
-      '#size' => 4,
-      '#attributes' => [
-        'data-stripe' => 'cvc'
-      ],
-      '#process' => [
-        'commerce_stripe_field_remove_name'
-      ]
-    ];
+    // Add class identifiers for card data.
+    $element['number']['#attributes']['class'][] = 'card-number';
+    $element['expiration']['month']['#attributes']['class'][] = 'card-expiry-month';
+    $element['expiration']['year']['#attributes']['class'][] = 'card-expiry-year';
+    $element['security_code']['#title'] = t('CVC');
+    $element['security_code']['#attributes']['class'][] = 'card-cvc';
 
     // Populated by the JS library.
     $element['stripe_token'] = [
@@ -97,12 +45,6 @@ class PaymentMethodAddForm extends BasePaymentMethodAddForm {
         'id' => 'stripe_token'
       ]
     ];
-
-    // To display validation errors.
-    $form['errors'] = array(
-      '#type' => 'markup',
-      '#markup' => '<div class="payment-errors"></div>',
-    );
 
     return $element;
   }
