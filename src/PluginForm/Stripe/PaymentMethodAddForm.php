@@ -17,7 +17,6 @@ class PaymentMethodAddForm extends BasePaymentMethodAddForm {
     $element['#attributes']['class'][] = 'stripe-form';
 
     // Set our key to settings array.
-    $element['#attached']['library'][] = 'commerce_stripe/form';
     /** @var \Drupal\commerce_stripe\Plugin\Commerce\PaymentGateway\StripeInterface $plugin */
     $plugin = $this->plugin;
     $element['#attached']['drupalSettings']['commerceStripe'] = [
