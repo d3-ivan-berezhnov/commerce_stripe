@@ -79,28 +79,28 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
 
     $form['secret_key_test'] = [
       '#type' => 'textfield',
-      '#title' => $this->t('Secret key (test)'),
+      '#title' => $this->t('Test Secret Key'),
       '#default_value' => $this->configuration['secret_key_test'],
       '#required' => TRUE,
     ];
 
     $form['publishable_key_test'] = [
       '#type' => 'textfield',
-      '#title' => $this->t('Publishable key (test)'),
+      '#title' => $this->t('Test Publishable Key'),
       '#default_value' => $this->configuration['publishable_key_test'],
       '#required' => TRUE,
     ];
 
     $form['secret_key'] = [
       '#type' => 'textfield',
-      '#title' => $this->t('Secret key (live)'),
+      '#title' => $this->t('Live Secret Key'),
       '#default_value' => $this->configuration['secret_key'],
       '#required' => TRUE,
     ];
 
     $form['publishable_key'] = [
       '#type' => 'textfield',
-      '#title' => $this->t('Publishable key (live)'),
+      '#title' => $this->t('Live Publishable Key'),
       '#default_value' => $this->configuration['publishable_key'],
       '#required' => TRUE,
     ];
