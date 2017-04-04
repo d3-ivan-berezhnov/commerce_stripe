@@ -117,25 +117,31 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
     if (!$form_state->getErrors()) {
       $values = $form_state->getValue($form['#parents']);
 
-      // Validate test keys.
-      if (!empty($values['secret_key_test'])) {
-        try {
-          $this->setApiKey($values['secret_key_test']);
-          \Stripe\Balance::retrieve();
-        }
-        catch (\Stripe\Error\Base $e) {
-          $form_state->setError($form['secret_key_test'], $this->t('Invalid Secret key (test).'));
-        }
-      }
+      $modes = [
+        'test' => [
+          'input' => '_test',
+          'livemode' => FALSE,
+        ],
+        'live' => [
+          'input' => '',
+          'livemode' => TRUE,
+        ],
+      ];
 
-      // Validate live keys.
-      if (!empty($values['secret_key'])) {
-        try {
-          $this->setApiKey($values['secret_key']);
-          \Stripe\Balance::retrieve();
-        }
-        catch (\Stripe\Error\Base $e) {
-          $form_state->setError($form['secret_key'], $this->t('Invalid Secret key (live).'));
+      // Validate secret keys.
+      foreach ($modes as $mode => $mode_data) {
+        $input = 'secret_key' . $mode_data['input'];
+        if (!empty($values[$input])) {
+          try {
+            $this->setApiKey($values[$input]);
+            // Make sure we use the right mode for the secret keys.
+            if (\Stripe\Balance::retrieve()->offsetGet('livemode') != $mode_data['livemode']) {
+              $form_state->setError($form[$input], $this->t('The @input is not for this mode: @mode.', ['@input' => $form[$input]['#title'], '@mode' => $mode]));
+            }
+          }
+          catch (\Stripe\Error\Base $e) {
+            $form_state->setError($form[$input], $this->t('Invalid @input.', ['@input' => $form[$input]['#title']]));
+          }
         }
       }
 
