@@ -19,14 +19,14 @@
    */
   Drupal.behaviors.commerceStripeForm = {
     attach: function (context) {
-      if (typeof drupalSettings.commerceStripe.fetched == 'undefined') {
-        drupalSettings.commerceStripe.fetched = true;
+      var $form = $('.stripe-form', context).closest('form');
+      if (drupalSettings.commerceStripe && drupalSettings.commerceStripe.publishableKey && !$form.hasClass('stripe-processed')) {
+        $form.addClass('stripe-processed');
         // Clear the token every time the payment form is loaded. We only need the token
         // one time, as it is submitted to Stripe after a card is validated. If this
         // form reloads it's due to an error; received tokens are stored in the checkout pane.
         $('#stripe_token').val('');
         Stripe.setPublishableKey(drupalSettings.commerceStripe.publishableKey);
-        var $form = $('.stripe-form', context).closest('form');
         var stripeResponseHandler = function (status, response) {
           if (response.error) {
             // Show the errors on the form
