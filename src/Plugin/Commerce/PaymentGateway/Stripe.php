@@ -181,16 +181,18 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
     }
     $amount = $payment->getAmount();
     $currency_code = $payment->getAmount()->getCurrencyCode();
-    $owner = $payment_method->getOwner();
-    $customer_id = $owner->commerce_remote_id->getByProvider('commerce_stripe');
 
     $transaction_data = [
       'currency' => $currency_code,
       'amount' => $this->formatNumber($amount->getNumber()),
-      'customer' => $customer_id,
       'source' => $payment_method->getRemoteId(),
       'capture' => $capture,
     ];
+
+    $owner = $payment_method->getOwner();
+    if ($owner && !$owner->isAnonymous()) {
+      $transaction_data['customer'] = $owner->commerce_remote_id->getByProvider('commerce_stripe');
+    }
 
     try {
       $result = \Stripe\Charge::create($transaction_data);
@@ -383,7 +385,7 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
     $owner = $payment_method->getOwner();
     $customer_id = NULL;
     $customer_data = [];
-    if ($owner) {
+    if ($owner && !$owner->isAnonymous()) {
       $customer_id = $owner->commerce_remote_id->getByProvider('commerce_stripe');
       $customer_data['email'] = $owner->getEmail();
     }
@@ -395,7 +397,7 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
       $card = $customer->sources->create(['source' => $payment_details['stripe_token']]);
       return $card;
     }
-    else {
+    elseif ($owner && !$owner->isAnonymous()) {
       // Create both the customer and the payment method.
       try {
         $customer = \Stripe\Customer::create([
@@ -417,6 +419,12 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
         $owner->commerce_remote_id->setByProvider('commerce_stripe', $customer_id);
         $owner->save();
       }
+    }
+    else {
+      $card_token = \Stripe\Token::retrieve($payment_details['stripe_token']);
+      // We need to use token for Anonymous customers.
+      $card_token->card['id'] = $payment_details['stripe_token'];
+      return $card_token->card;
     }
 
     return [];
