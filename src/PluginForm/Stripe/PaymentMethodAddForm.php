@@ -11,31 +11,16 @@ class PaymentMethodAddForm extends BasePaymentMethodAddForm {
    * {@inheritdoc}
    */
   public function buildCreditCardForm(array $element, FormStateInterface $form_state) {
-    $element = parent::buildCreditCardForm($element, $form_state);
-
     // Alter the form with Stripe specific needs.
     $element['#attributes']['class'][] = 'stripe-form';
 
     // Set our key to settings array.
     /** @var \Drupal\commerce_stripe\Plugin\Commerce\PaymentGateway\StripeInterface $plugin */
     $plugin = $this->plugin;
+    $element['#attached']['library'][] = 'commerce_stripe/form';
     $element['#attached']['drupalSettings']['commerceStripe'] = [
       'publishableKey' => $plugin->getStripePublishableKey(),
     ];
-
-    // To display validation errors.
-    $element['payment_errors'] = [
-      '#type' => 'markup',
-      '#markup' => '<div class="payment-errors"></div>',
-      '#weight' => -200,
-    ];
-
-    // Add class identifiers for card data.
-    $element['number']['#attributes']['class'][] = 'card-number';
-    $element['expiration']['month']['#attributes']['class'][] = 'card-expiry-month';
-    $element['expiration']['year']['#attributes']['class'][] = 'card-expiry-year';
-    $element['security_code']['#title'] = t('CVC');
-    $element['security_code']['#attributes']['class'][] = 'card-cvc';
 
     // Populated by the JS library.
     $element['stripe_token'] = [
@@ -43,6 +28,40 @@ class PaymentMethodAddForm extends BasePaymentMethodAddForm {
       '#attributes' => [
         'id' => 'stripe_token'
       ]
+    ];
+
+    $element['card_number'] = [
+      '#type' => 'item',
+      '#title' => t('The card number'),
+      '#label_attributes' => [
+        'class' => ['js-form-required', 'form-required'],
+      ],
+      '#markup' => '<div id="card-number-element" class="form-text"></div>',
+    ];
+
+    $element['expiration'] = [
+      '#type' => 'item',
+      '#title' => t('Expiration date'),
+      '#label_attributes' => [
+        'class' => ['js-form-required', 'form-required'],
+      ],
+      '#markup' => '<div id="expiration-element"></div>',
+    ];
+
+    $element['security_code'] = [
+      '#type' => 'item',
+      '#title' => t('CVC'),
+      '#label_attributes' => [
+        'class' => ['js-form-required', 'form-required'],
+      ],
+      '#markup' => '<div id="security-code-element"></div>',
+    ];
+
+    // To display validation errors.
+    $element['payment_errors'] = [
+      '#type' => 'markup',
+      '#markup' => '<div id="payment-errors"></div>',
+      '#weight' => -200,
     ];
 
     return $element;
