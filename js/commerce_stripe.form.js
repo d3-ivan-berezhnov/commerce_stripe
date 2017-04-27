@@ -3,7 +3,7 @@
  * Javascript to generate Stripe token in PCI-compliant way.
  */
 
-(function ($, Drupal, drupalSettings, stripe) {
+(function($, Drupal, drupalSettings) {
 
   'use strict';
 
@@ -19,15 +19,19 @@
    */
   Drupal.behaviors.commerceStripeForm = {
     attach: function (context) {
-      var $form = $('.stripe-form', context).closest('form');
-      if (drupalSettings.commerceStripe && drupalSettings.commerceStripe.publishableKey && !$form.hasClass('stripe-processed')) {
-          $form.addClass('stripe-processed');
+      if (!drupalSettings.commerceStripe || !drupalSettings.commerceStripe.publishableKey) {
+          return;
+      }
+      $('.stripe-form', context).once('stripe-processed').each(function () {
+          var $form = $(this).closest('form');
+
           // Clear the token every time the payment form is loaded. We only need the token
           // one time, as it is submitted to Stripe after a card is validated. If this
           // form reloads it's due to an error; received tokens are stored in the checkout pane.
-          $('#stripe_token').val('');
+          $('#stripe_token', context).val('');
 
           // Create a Stripe client.
+          /* global Stripe */
           var stripe = Stripe(drupalSettings.commerceStripe.publishableKey);
 
           // Create an instance of Stripe Elements.
@@ -65,7 +69,7 @@
           // Insert the token ID into the form so it gets submitted to the server
           var stripeTokenHandler = function (token) {
               // Set the Stripe token value.
-              $('#stripe_token').val(token.id);
+              $('#stripe_token', context).val(token.id);
 
               // Submit the form.
               $form.get(0).submit();
@@ -112,11 +116,11 @@
               stripeCreateToken();
 
               // Prevent the form from submitting with the default action.
-              if ($('#card-number-element').length) {
+              if ($('#card-number-element', context).length) {
                   return false;
               }
           });
-      }
+      });
     }
   };
 
