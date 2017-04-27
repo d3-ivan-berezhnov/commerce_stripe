@@ -32,7 +32,7 @@ class PaymentMethodAddForm extends BasePaymentMethodAddForm {
 
     $element['card_number'] = [
       '#type' => 'item',
-      '#title' => t('The card number'),
+      '#title' => $this->t('The card number'),
       '#label_attributes' => [
         'class' => ['js-form-required', 'form-required'],
       ],
@@ -41,7 +41,7 @@ class PaymentMethodAddForm extends BasePaymentMethodAddForm {
 
     $element['expiration'] = [
       '#type' => 'item',
-      '#title' => t('Expiration date'),
+      '#title' => $this->t('Expiration date'),
       '#label_attributes' => [
         'class' => ['js-form-required', 'form-required'],
       ],
@@ -50,7 +50,7 @@ class PaymentMethodAddForm extends BasePaymentMethodAddForm {
 
     $element['security_code'] = [
       '#type' => 'item',
-      '#title' => t('CVC'),
+      '#title' => $this->t('CVC'),
       '#label_attributes' => [
         'class' => ['js-form-required', 'form-required'],
       ],
