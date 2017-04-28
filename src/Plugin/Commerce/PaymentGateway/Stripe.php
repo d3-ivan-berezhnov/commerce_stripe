@@ -408,16 +408,14 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
         $cards = \Stripe\Customer::retrieve($customer->id)->sources->all(['object' => 'card']);
         $cards_array = \Stripe\Util\Util::convertStripeObjectToArray([$cards]);
         $customer_id = $customer->id;
+        $owner->commerce_remote_id->setByProvider('commerce_stripe', $customer_id);
+        $owner->save();
         foreach ($cards_array[0]['data'] as $card) {
           return $card;
         }
       }
       catch (\Stripe\Error\Base $e) {
         ErrorHelper::handleException($e);
-      }
-      if ($owner) {
-        $owner->commerce_remote_id->setByProvider('commerce_stripe', $customer_id);
-        $owner->save();
       }
     }
     else {
