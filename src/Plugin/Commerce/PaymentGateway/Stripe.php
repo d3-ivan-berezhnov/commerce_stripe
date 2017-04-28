@@ -176,7 +176,7 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
     if (empty($payment_method)) {
       throw new \InvalidArgumentException('The provided payment has no payment method referenced.');
     }
-    if (REQUEST_TIME >= $payment_method->getExpiresTime()) {
+    if ($payment_method->isExpired()) {
       throw new HardDeclineException('The provided payment method has expired');
     }
     $amount = $payment->getAmount();
@@ -202,12 +202,14 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
       ErrorHelper::handleException($e);
     }
 
+    // Update the local payment entity.
+    $request_time = \Drupal::time()->getRequestTime();
     $payment->state = $capture ? 'capture_completed' : 'authorization';
     $payment->setRemoteId($result['id']);
-    $payment->setAuthorizedTime(REQUEST_TIME);
+    $payment->setAuthorizedTime($request_time);
     // @todo Find out how long an authorization is valid, set its expiration.
     if ($capture) {
-      $payment->setCapturedTime(REQUEST_TIME);
+      $payment->setCapturedTime($request_time);
     }
     $payment->save();
   }
@@ -236,9 +238,10 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
       ErrorHelper::handleException($e);
     }
 
+    // Update the local payment entity.
     $payment->state = 'capture_completed';
     $payment->setAmount($amount);
-    $payment->setCapturedTime(REQUEST_TIME);
+    $payment->setCapturedTime(\Drupal::time()->getRequestTime());
     $payment->save();
   }
 
