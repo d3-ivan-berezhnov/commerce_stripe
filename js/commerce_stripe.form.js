@@ -3,7 +3,7 @@
  * Javascript to generate Stripe token in PCI-compliant way.
  */
 
-(function($, Drupal, drupalSettings) {
+(function ($, Drupal, drupalSettings) {
 
   'use strict';
 
@@ -20,106 +20,106 @@
   Drupal.behaviors.commerceStripeForm = {
     attach: function (context) {
       if (!drupalSettings.commerceStripe || !drupalSettings.commerceStripe.publishableKey) {
-          return;
+        return;
       }
       $('.stripe-form', context).once('stripe-processed').each(function () {
-          var $form = $(this).closest('form');
+        var $form = $(this).closest('form');
 
-          // Clear the token every time the payment form is loaded. We only need the token
-          // one time, as it is submitted to Stripe after a card is validated. If this
-          // form reloads it's due to an error; received tokens are stored in the checkout pane.
-          $('#stripe_token', context).val('');
+        // Clear the token every time the payment form is loaded. We only need the token
+        // one time, as it is submitted to Stripe after a card is validated. If this
+        // form reloads it's due to an error; received tokens are stored in the checkout pane.
+        $('#stripe_token', context).val('');
 
-          // Create a Stripe client.
-          /* global Stripe */
-          var stripe = Stripe(drupalSettings.commerceStripe.publishableKey);
+        // Create a Stripe client.
+        /* global Stripe */
+        var stripe = Stripe(drupalSettings.commerceStripe.publishableKey);
 
-          // Create an instance of Stripe Elements.
-          var elements = stripe.elements();
-          var classes = {
-              base: 'form-text',
-              invalid: 'error',
-          };
-          // Create instances of the card elements.
-          var cardNumber = elements.create('cardNumber', {
-              classes: classes,
+        // Create an instance of Stripe Elements.
+        var elements = stripe.elements();
+        var classes = {
+          base: 'form-text',
+          invalid: 'error'
+        };
+        // Create instances of the card elements.
+        var cardNumber = elements.create('cardNumber', {
+          classes: classes
+        });
+        var cardExpiry = elements.create('cardExpiry', {
+          classes: classes
+        });
+        var cardCvc = elements.create('cardCvc', {
+          classes: classes
+        });
+        // Add an instance of the card UI components into the "scard-element" element <div>
+        cardNumber.mount('#card-number-element');
+        cardExpiry.mount('#expiration-element');
+        cardCvc.mount('#security-code-element');
+
+        // Input validation.
+        cardNumber.on('change', function (event) {
+          stripeErrorHandler(event);
+        });
+        cardExpiry.on('change', function (event) {
+          stripeErrorHandler(event);
+        });
+        cardCvc.on('change', function (event) {
+          stripeErrorHandler(event);
+        });
+
+        // Insert the token ID into the form so it gets submitted to the server
+        var stripeTokenHandler = function (token) {
+          // Set the Stripe token value.
+          $('#stripe_token', context).val(token.id);
+
+          // Submit the form.
+          $form.get(0).submit();
+        };
+
+        // Helper to handle the Stripe responses with errors.
+        var stripeErrorHandler = function (result) {
+          if (result.error) {
+            // Inform the user if there was an error.
+            stripeErrorDisplay(result.error.message);
+          }
+          else {
+            // Clean up error messages.
+            $form.find('#payment-errors').html('');
+          }
+        };
+
+        // Helper for displaying the error messages within the form.
+        var stripeErrorDisplay = function (error_message) {
+          // Display the message error in the payment form.
+          $form.find('#payment-errors').html(Drupal.theme('commerceStripeError', error_message));
+        };
+
+        // Create a Stripe token and submit the form or display an error.
+        var stripeCreateToken = function () {
+          stripe.createToken(cardNumber).then(function (result) {
+            if (result.error) {
+              // Inform the user if there was an error.
+              stripeErrorDisplay(result.error.message);
+            }
+            else {
+              // Send the token to your server.
+              stripeTokenHandler(result.token);
+            }
           });
-          var cardExpiry = elements.create('cardExpiry', {
-              classes: classes,
-          });
-          var cardCvc = elements.create('cardCvc', {
-              classes: classes,
-          });
-          // Add an instance of the card UI components into the "scard-element" element <div>
-          cardNumber.mount('#card-number-element');
-          cardExpiry.mount('#expiration-element');
-          cardCvc.mount('#security-code-element');
+        };
 
-          // Input validation.
-          cardNumber.on('change', function(event) {
-              stripeErrorHandler(event);
-          });
-          cardExpiry.on('change', function(event) {
-              stripeErrorHandler(event);
-          });
-          cardCvc.on('change', function(event) {
-              stripeErrorHandler(event);
-          });
+        // Form submit.
+        $form.submit(function (e) {
+          // Disable the submit button to prevent repeated clicks.
+          $form.find('button').prop('disabled', true);
 
-          // Insert the token ID into the form so it gets submitted to the server
-          var stripeTokenHandler = function (token) {
-              // Set the Stripe token value.
-              $('#stripe_token', context).val(token.id);
+          // Try to create the Stripe token and submit the form.
+          stripeCreateToken();
 
-              // Submit the form.
-              $form.get(0).submit();
-          };
-
-          // Helper to handle the Stripe responses with errors.
-          var stripeErrorHandler = function (result) {
-              if (result.error) {
-                  // Inform the user if there was an error.
-                  stripeErrorDisplay(result.error.message);
-              }
-              else {
-                  // Clean up error messages.
-                  $form.find('#payment-errors').html('');
-              }
-          };
-
-          // Helper for displaying the error messages within the form.
-          var stripeErrorDisplay = function (error_message) {
-               // Display the message error in the payment form.
-               $form.find('#payment-errors').html(Drupal.theme('commerceStripeError', error_message));
-          };
-
-          // Create a Stripe token and submit the form or display an error.
-          var stripeCreateToken = function () {
-              stripe.createToken(cardNumber).then(function (result) {
-                  if (result.error) {
-                      // Inform the user if there was an error.
-                      stripeErrorDisplay(result.error.message);
-                  }
-                  else {
-                      // Send the token to your server.
-                      stripeTokenHandler(result.token);
-                  }
-              });
-          };
-
-          // Form submit.
-          $form.submit(function (e) {
-              // Disable the submit button to prevent repeated clicks.
-              $form.find('button').prop('disabled', true);
-
-              // Try to create the Stripe token and submit the form.
-              stripeCreateToken();
-
-              // Prevent the form from submitting with the default action.
-              if ($('#card-number-element', context).length) {
-                  return false;
-              }
-          });
+          // Prevent the form from submitting with the default action.
+          if ($('#card-number-element', context).length) {
+            return false;
+          }
+        });
       });
     }
   };
