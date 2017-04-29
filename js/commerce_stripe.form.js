@@ -12,13 +12,26 @@
    *
    * @type {Drupal~behavior}
    *
+   * @prop object cardNumber
+   *   Stripe card number element.
+   * @prop object cardExpiry
+   *   Stripe card expiry element.
+   * @prop object cardCvc
+   *   Stripe card cvc element.
    * @prop {Drupal~behaviorAttach} attach
    *   Attaches the commerceStripeForm behavior.
+   * @prop {Drupal~behaviorDetach} detach
+   *   Detaches the commerceStripeForm behavior.
    *
    * @see Drupal.commerceStripe
    */
   Drupal.behaviors.commerceStripeForm = {
+    cardNumber: null,
+    cardExpiry: null,
+    cardCvc: null,
+
     attach: function (context) {
+      var self = this;
       if (!drupalSettings.commerceStripe || !drupalSettings.commerceStripe.publishableKey) {
         return;
       }
@@ -28,7 +41,7 @@
         // Clear the token every time the payment form is loaded. We only need the token
         // one time, as it is submitted to Stripe after a card is validated. If this
         // form reloads it's due to an error; received tokens are stored in the checkout pane.
-        $('#stripe_token', context).val('');
+        $('#stripe_token', $form).val('');
 
         // Create a Stripe client.
         /* global Stripe */
@@ -41,35 +54,35 @@
           invalid: 'error'
         };
         // Create instances of the card elements.
-        var cardNumber = elements.create('cardNumber', {
+        self.cardNumber = elements.create('cardNumber', {
           classes: classes
         });
-        var cardExpiry = elements.create('cardExpiry', {
+        self.cardExpiry = elements.create('cardExpiry', {
           classes: classes
         });
-        var cardCvc = elements.create('cardCvc', {
+        self.cardCvc = elements.create('cardCvc', {
           classes: classes
         });
         // Add an instance of the card UI components into the "scard-element" element <div>
-        cardNumber.mount('#card-number-element');
-        cardExpiry.mount('#expiration-element');
-        cardCvc.mount('#security-code-element');
+        self.cardNumber.mount('#card-number-element');
+        self.cardExpiry.mount('#expiration-element');
+        self.cardCvc.mount('#security-code-element');
 
         // Input validation.
-        cardNumber.on('change', function (event) {
+        self.cardNumber.on('change', function (event) {
           stripeErrorHandler(event);
         });
-        cardExpiry.on('change', function (event) {
+        self.cardExpiry.on('change', function (event) {
           stripeErrorHandler(event);
         });
-        cardCvc.on('change', function (event) {
+        self.cardCvc.on('change', function (event) {
           stripeErrorHandler(event);
         });
 
         // Insert the token ID into the form so it gets submitted to the server
         var stripeTokenHandler = function (token) {
           // Set the Stripe token value.
-          $('#stripe_token', context).val(token.id);
+          $('#stripe_token', $form).val(token.id);
 
           // Submit the form.
           $form.get(0).submit();
@@ -95,7 +108,7 @@
 
         // Create a Stripe token and submit the form or display an error.
         var stripeCreateToken = function () {
-          stripe.createToken(cardNumber).then(function (result) {
+          stripe.createToken(self.cardNumber).then(function (result) {
             if (result.error) {
               // Inform the user if there was an error.
               stripeErrorDisplay(result.error.message);
@@ -108,7 +121,7 @@
         };
 
         // Form submit.
-        $form.submit(function (e) {
+        $form.on('submit.commerce_stripe', function (e) {
           // Disable the submit button to prevent repeated clicks.
           $form.find('button').prop('disabled', true);
 
@@ -116,11 +129,22 @@
           stripeCreateToken();
 
           // Prevent the form from submitting with the default action.
-          if ($('#card-number-element', context).length) {
+          if ($('#card-number-element', $form).length) {
             return false;
           }
         });
       });
+    },
+
+    detach: function (context) {
+      var self = this;
+      ['cardNumber', 'cardExpiry', 'cardCvc'].forEach(function (i) {
+        if (self[i]) {
+          self[i].unmount();
+          self[i] = null;
+        }
+      });
+      $('.stripe-form', context).closest('form').off('submit.commerce_stripe');
     }
   };
 
