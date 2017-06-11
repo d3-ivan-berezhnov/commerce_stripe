@@ -1382,7 +1382,7 @@ function commerce_stripe_load_library() {
   }
   else {
     $minimum_version = '3.0.0';
-    $maximum_version = '4.10.0';
+    $maximum_version = '4.12.0';
     $message = "Commerce Stripe is currently tested with stripe-php library versions @minimum_version through @maximum_version. You are using version @installed_version, and you should @upgrade_or_downgrade.";
 
     //check that it's not lower than the minimum required version
