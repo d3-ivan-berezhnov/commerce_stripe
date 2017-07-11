@@ -104,6 +104,9 @@
         var stripeErrorDisplay = function (error_message) {
           // Display the message error in the payment form.
           $form.find('#payment-errors').html(Drupal.theme('commerceStripeError', error_message));
+
+          // Allow the customer to re-submit the form.
+          $form.find('button').prop('disabled', false);
         };
 
         // Create a Stripe token and submit the form or display an error.
