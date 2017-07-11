@@ -19,7 +19,7 @@ class PaymentMethodAddForm extends BasePaymentMethodAddForm {
     $plugin = $this->plugin;
     $element['#attached']['library'][] = 'commerce_stripe/form';
     $element['#attached']['drupalSettings']['commerceStripe'] = [
-      'publishableKey' => $plugin->getStripePublishableKey(),
+      'publishableKey' => $plugin->getPublishableKey(),
     ];
 
     // Populated by the JS library.

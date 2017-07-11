@@ -39,24 +39,15 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
    */
   public function __construct(array $configuration, $plugin_id, $plugin_definition, EntityTypeManagerInterface $entity_type_manager, PaymentTypeManager $payment_type_manager, PaymentMethodTypeManager $payment_method_type_manager) {
     parent::__construct($configuration, $plugin_id, $plugin_definition, $entity_type_manager, $payment_type_manager, $payment_method_type_manager);
-    if ($this->configuration['secret_key_test']) {
-      $key = ($this->getMode() == 'test') ? $this->configuration['secret_key_test'] : $this->configuration['secret_key'];
-      $this->setApiKey($key);
-    }
+
+    \Stripe\Stripe::setApiKey($this->configuration['secret_key']);
   }
 
   /**
    * {@inheritdoc}
    */
-  public function setApiKey($secret_key) {
-    \Stripe\Stripe::setApiKey($secret_key);
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function getStripePublishableKey() {
-    return $key = ($this->getMode() == 'test') ? $this->configuration['publishable_key_test'] : $this->configuration['publishable_key'];
+  public function getPublishableKey() {
+    return $this->configuration['publishable_key'];
   }
 
   /**
@@ -64,10 +55,8 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
    */
   public function defaultConfiguration() {
     return [
-      'secret_key_test' => '',
-      'publishable_key_test' => '',
-      'secret_key' => '',
       'publishable_key' => '',
+      'secret_key' => '',
     ] + parent::defaultConfiguration();
   }
 
@@ -77,31 +66,16 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
   public function buildConfigurationForm(array $form, FormStateInterface $form_state) {
     $form = parent::buildConfigurationForm($form, $form_state);
 
-    $form['secret_key_test'] = [
-      '#type' => 'textfield',
-      '#title' => $this->t('Test Secret Key'),
-      '#default_value' => $this->configuration['secret_key_test'],
-      '#required' => TRUE,
-    ];
-
-    $form['publishable_key_test'] = [
-      '#type' => 'textfield',
-      '#title' => $this->t('Test Publishable Key'),
-      '#default_value' => $this->configuration['publishable_key_test'],
-      '#required' => TRUE,
-    ];
-
-    $form['secret_key'] = [
-      '#type' => 'textfield',
-      '#title' => $this->t('Live Secret Key'),
-      '#default_value' => $this->configuration['secret_key'],
-      '#required' => TRUE,
-    ];
-
     $form['publishable_key'] = [
       '#type' => 'textfield',
-      '#title' => $this->t('Live Publishable Key'),
+      '#title' => $this->t('Publishable Key'),
       '#default_value' => $this->configuration['publishable_key'],
+      '#required' => TRUE,
+    ];
+    $form['secret_key'] = [
+      '#type' => 'textfield',
+      '#title' => $this->t('Secret Key'),
+      '#default_value' => $this->configuration['secret_key'],
       '#required' => TRUE,
     ];
 
@@ -116,36 +90,20 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
 
     if (!$form_state->getErrors()) {
       $values = $form_state->getValue($form['#parents']);
-
-      $modes = [
-        'test' => [
-          'input' => '_test',
-          'livemode' => FALSE,
-        ],
-        'live' => [
-          'input' => '',
-          'livemode' => TRUE,
-        ],
-      ];
-
-      // Validate secret keys.
-      foreach ($modes as $mode => $mode_data) {
-        $input = 'secret_key' . $mode_data['input'];
-        if (!empty($values[$input])) {
-          try {
-            $this->setApiKey($values[$input]);
-            // Make sure we use the right mode for the secret keys.
-            if (\Stripe\Balance::retrieve()->offsetGet('livemode') != $mode_data['livemode']) {
-              $form_state->setError($form[$input], $this->t('The @input is not for this mode: @mode.', ['@input' => $form[$input]['#title'], '@mode' => $mode]));
-            }
-          }
-          catch (\Stripe\Error\Base $e) {
-            $form_state->setError($form[$input], $this->t('Invalid @input.', ['@input' => $form[$input]['#title']]));
+      // Validate the secret key.
+      $expected_livemode = $values['mode'] == 'live' ? TRUE : FALSE;
+      if (!empty($values['secret_key'])) {
+        try {
+          \Stripe\Stripe::setApiKey($values['secret_key']);
+          // Make sure we use the right mode for the secret keys.
+          if (\Stripe\Balance::retrieve()->offsetGet('livemode') != $expected_livemode) {
+            $form_state->setError($form['secret_key'], $this->t('The provided secret key is not for the selected mode (@mode).', ['@mode' => $mode]));
           }
         }
+        catch (\Stripe\Error\Base $e) {
+          $form_state->setError($form['secret_key'], $this->t('Invalid secret key.'));
+        }
       }
-
-      // @todo: Publishable keys validation, if possible.
     }
   }
 
@@ -157,10 +115,8 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
 
     if (!$form_state->getErrors()) {
       $values = $form_state->getValue($form['#parents']);
-      $this->configuration['secret_key_test'] = $values['secret_key_test'];
-      $this->configuration['publishable_key_test'] = $values['publishable_key_test'];
-      $this->configuration['secret_key'] = $values['secret_key'];
       $this->configuration['publishable_key'] = $values['publishable_key'];
+      $this->configuration['secret_key'] = $values['secret_key'];
     }
   }
 

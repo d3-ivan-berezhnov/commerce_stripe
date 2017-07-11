@@ -43,11 +43,11 @@ CONFIGURATION
 * Create new Stripe payment gateway
   Administration > Commerce > Configuration > Payment gateways > Add payment gateway
   Stripe specific settings available:
-  - Secret key (test);
-  - Publishable key (test);
-  - Secret key (live);
-  - Publishable key (live).
-  All those API credentials are provided by the Stripe merchant account.
+  - Secret key.
+  - Publishable key.
+  All those API credentials are provided by the Stripe merchant account. It is
+  recommended to enter test credentials and then override these with live
+  credentials in settings.php. This way live credentials will not be exported to code.
 
 
 HOW IT WORKS
