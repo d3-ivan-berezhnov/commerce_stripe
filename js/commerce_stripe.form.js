@@ -139,15 +139,22 @@
       });
     },
 
-    detach: function (context) {
+    detach: function (context, settings, trigger) {
+      if (trigger !== 'unload') {
+        return;
+      }
       var self = this;
       ['cardNumber', 'cardExpiry', 'cardCvc'].forEach(function (i) {
-        if (self[i]) {
+        if (self[i] && self[i].length > 0) {
           self[i].unmount();
           self[i] = null;
         }
       });
-      $('.stripe-form', context).closest('form').off('submit.commerce_stripe');
+      var $form = $('.stripe-form', context).closest('form');
+      if ($form.length === 0) {
+        return;
+      }
+      $form.off('submit.commerce_stripe');
     }
   };
 
