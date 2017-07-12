@@ -140,8 +140,8 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
     ];
 
     $owner = $payment_method->getOwner();
-    if ($owner && !$owner->isAnonymous()) {
-      $transaction_data['customer'] = $owner->commerce_remote_id->getByProvider('commerce_stripe');
+    if ($owner && $owner->isAuthenticated()) {
+      $transaction_data['customer'] = $this->getRemoteCustomerId($owner);
     }
 
     try {
@@ -282,7 +282,7 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
     try {
       $owner = $payment_method->getOwner();
       if ($owner) {
-        $customer_id = $owner->commerce_remote_id->getByProvider('commerce_stripe');
+        $customer_id = $this->getRemoteCustomerId($owner);
         $customer = \Stripe\Customer::retrieve($customer_id);
         $customer->sources->retrieve($payment_method->getRemoteId())->delete();
       }
@@ -317,7 +317,7 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
     $customer_id = NULL;
     $customer_data = [];
     if ($owner && !$owner->isAnonymous()) {
-      $customer_id = $owner->commerce_remote_id->getByProvider('commerce_stripe');
+      $customer_id = $this->getRemoteCustomerId($owner);
       $customer_data['email'] = $owner->getEmail();
     }
 
@@ -338,8 +338,7 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
         ]);
         $cards = \Stripe\Customer::retrieve($customer->id)->sources->all(['object' => 'card']);
         $cards_array = \Stripe\Util\Util::convertStripeObjectToArray([$cards]);
-        $customer_id = $customer->id;
-        $owner->commerce_remote_id->setByProvider('commerce_stripe', $customer_id);
+        $this->setRemoteCustomerId($owner, $customer->id);
         $owner->save();
         foreach ($cards_array[0]['data'] as $card) {
           return $card;
