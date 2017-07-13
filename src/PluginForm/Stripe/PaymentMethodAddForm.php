@@ -32,7 +32,7 @@ class PaymentMethodAddForm extends BasePaymentMethodAddForm {
 
     $element['card_number'] = [
       '#type' => 'item',
-      '#title' => t('The card number'),
+      '#title' => t('Card number'),
       '#label_attributes' => [
         'class' => ['js-form-required', 'form-required'],
       ],
