@@ -43,10 +43,6 @@ class ErrorHelper {
       \Drupal::logger('commerce_stripe')->warning($exception->getMessage());
       throw new InvalidResponseException('Network communication with Stripe failed.');
     }
-    elseif ($exception instanceof \Stripe\Error\ApiConnection) {
-      \Drupal::logger('commerce_stripe')->warning($exception->getMessage());
-      throw new InvalidResponseException('Network communication with Stripe failed.');
-    }
     elseif ($exception instanceof \Stripe\Error\Base) {
       \Drupal::logger('commerce_stripe')->warning($exception->getMessage());
       throw new InvalidResponseException('There was an error with Stripe request.');
