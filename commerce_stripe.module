@@ -42,7 +42,9 @@ function commerce_stripe_libraries_info() {
       'dependencies' => array(),
       'version arguments' => array(
         'file' => 'VERSION',
-        'pattern' => '/((4|3)+\.\d+(\.\d)?)/',
+        'pattern' => '/((\d+)\.(\d+)\.(\d+))/',
+        'lines' => 1,
+        'cols' => 12,
       ),
       'files' => array(
         'php' => array(
@@ -1377,29 +1379,8 @@ function commerce_stripe_cardonfile_delete($form, &$form_state, $payment_method,
 function commerce_stripe_load_library() {
   $library = libraries_load('stripe-php');
   if (!$library || empty($library['loaded'])) {
-    watchdog('commerce_stripe', 'Failure to load Stripe API PHP Client Library.', array(), WATCHDOG_CRITICAL);
+    watchdog('commerce_stripe', 'Failure to load Stripe API PHP Client Library. Please see the Status Report for more.', array(), WATCHDOG_CRITICAL);
     return FALSE;
-  }
-  else {
-    $minimum_version = '3.0.0';
-    $maximum_version = '4.12.0';
-    $message = "Commerce Stripe is currently tested with stripe-php library versions @minimum_version through @maximum_version. You are using version @installed_version, and you should @upgrade_or_downgrade.";
-
-    //check that it's not lower than the minimum required version
-    if (version_compare($library['version'], $minimum_version, '<')) {
-      $variables = array('@minimum_version' => $minimum_version, '@maximum_version' => $maximum_version, '@installed_version' => $library['version'], '@upgrade_or_downgrade' => 'upgrade');
-      watchdog('commerce_stripe', $message, $variables, WATCHDOG_WARNING);
-      return FALSE;
-    }
-
-    //check that it's not higher than the maximum tested version
-    elseif (version_compare($library['version'], $maximum_version, '>')) {
-      $variables = array('@minimum_version' => $minimum_version, '@maximum_version' => $maximum_version, '@installed_version' => $library['version'], '@upgrade_or_downgrade' => 'downgrade');
-      watchdog('commerce_stripe', $message, $variables, WATCHDOG_WARNING);
-      return FALSE;
-    }
-
-    return TRUE;
   }
 }
 
