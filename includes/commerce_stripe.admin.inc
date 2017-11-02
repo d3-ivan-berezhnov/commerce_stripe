@@ -167,3 +167,210 @@ function commerce_stripe_refund_form_submit($form, &$form_state) {
       array('@error' => $e->getMessage())), 'error');
   }
 }
+
+/**
+ * Form callback for capturing a authorized payment.
+ */
+function commerce_stripe_capture_form($form, &$form_state, $order, $transaction) {
+  $form_state['order'] = $order;
+  $form_state['transaction'] = $transaction;
+
+  // Load and store the payment method instance for this transaction.
+  $payment_method = commerce_payment_method_instance_load($transaction->instance_id);
+  $form_state['payment_method'] = $payment_method;
+
+  $balance = commerce_payment_order_balance($order);
+
+  if ($balance['amount'] > 0 && $balance['amount'] < $transaction->amount) {
+    $default_amount = $balance['amount'];
+  }
+  else {
+    $default_amount = $transaction->amount;
+  }
+
+  // Convert the price amount to a user friendly decimal value.
+  $default_amount = number_format(commerce_currency_amount_to_decimal($default_amount, $transaction->currency_code), 2, '.', '');
+
+  $description = implode('<br />', array(
+    t('Authorization: @amount', array('@amount' => commerce_currency_format($transaction->amount, $transaction->currency_code))),
+    t('Order balance: @balance', array('@balance' => commerce_currency_format($balance['amount'], $balance['currency_code']))),
+  ));
+
+  $form['amount'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Capture amount'),
+    '#description' => $description,
+    '#default_value' => $default_amount,
+    '#field_suffix' => check_plain($transaction->currency_code),
+    '#size' => 16,
+  );
+
+  $form = confirm_form($form,
+    t('What amount do you want to capture?'),
+    'admin/commerce/orders/' . $order->order_id . '/payment',
+    '',
+    t('Capture'),
+    t('Cancel'),
+    'confirm'
+  );
+
+  return $form;
+}
+
+/**
+ * Validate handler: ensure a valid amount is given.
+ */
+function commerce_stripe_capture_form_validate($form, &$form_state) {
+  $transaction = $form_state['transaction'];
+  $amount = $form_state['values']['amount'];
+
+  // Verify this transaction is authorization only (AUTH_ONLY).
+  if ($transaction->remote_status != 'AUTH_ONLY') {
+    drupal_set_message(t('This operation can only be done on authorization only transactions.'), 'error');
+    drupal_goto('admin/commerce/orders/' . $form_state['order']->order_id . '/payment');
+  }
+
+  // Verify a positive numeric amount has been entered for capture.
+  if (!is_numeric($amount) || $amount <= 0) {
+    form_set_error('amount', t('You must specify a positive numeric amount to capture.'));
+  }
+
+  // Verify the amount is less than or equal to the authorization amount.
+  if ($amount > commerce_currency_amount_to_decimal($transaction->amount, $transaction->currency_code)) {
+    form_set_error('amount', t('You cannot capture more than you authorized through Commerce Stripe.'));
+  }
+
+  // If the authorization has expired, display an error message and redirect.
+  if (time() - $transaction->created > 86400 * 7) {
+    drupal_set_message(t('This authorization has passed its 7 day limit and cannot be captured.'), 'error');
+    drupal_goto('admin/commerce/orders/' . $form_state['order']->order_id . '/payment');
+  }
+}
+
+/**
+ * Submit handler: process a prior authorization capture via AIM.
+ */
+function commerce_stripe_capture_form_submit($form, &$form_state) {
+  $transaction = $form_state['transaction'];
+  $payment_method = $form_state['payment_method'];
+
+  $dec_amount = number_format($form_state['values']['amount'], 2, '.', '');
+
+  if (!commerce_stripe_load_library()) {
+    drupal_set_message(t('Error capturing payment. Please contact shop admin to proceed.'), 'error');
+    drupal_goto('admin/commerce/orders/' . $form_state['order']->order_id . '/payment');
+  }
+
+  // Set the amount that is to be captured. This amount has already been
+  // validated, but needs to be converted to cents for Stripe.
+  $capture_amount = commerce_currency_decimal_to_amount($dec_amount, $transaction->currency_code);
+
+  $cparams = array(
+    'amount' => $capture_amount,
+  );
+
+  _commerce_stripe_set_api_key($payment_method);
+
+  try {
+    $charge = Stripe\Charge::retrieve($transaction->remote_id);
+
+    $response = $charge->capture($cparams);
+
+    $transaction->payload[REQUEST_TIME] = $response->__toJSON();
+    $transaction->remote_status = commerce_stripe_get_remote_status(NULL, $transaction, 'capture');
+    $transaction->message .= '<br />' . t('Captured: @date', array('@date' => format_date(REQUEST_TIME, 'short')));
+    $transaction->message .= '<br />' . t('Captured Amount: @amount', array('@amount' => $dec_amount));
+    $transaction->status = COMMERCE_PAYMENT_STATUS_SUCCESS;
+    $transaction->amount = $capture_amount;
+    commerce_payment_transaction_save($transaction);
+  }
+  catch (Exception $e) {
+    drupal_set_message(t('We received the following error when trying to capture the transaction.'), 'error');
+    drupal_set_message(check_plain($e->getMessage()), 'error');
+    watchdog('commerce_stripe', 'Following error received when processing card for capture @stripe_error.', array('@stripe_error' => $e->getMessage()), WATCHDOG_NOTICE);
+
+    $transaction->payload[REQUEST_TIME] = $e->json_body;
+    $transaction->message = t('Capture processing error: @stripe_error', array('@stripe_error' => $e->getMessage()));
+    $transaction->status = COMMERCE_PAYMENT_STATUS_FAILURE;
+    $transaction->remote_status = 'FAILED';
+    commerce_payment_transaction_save($transaction);
+  }
+
+  $form_state['redirect'] = 'admin/commerce/orders/' . $form_state['order']->order_id . '/payment';
+}
+
+/**
+ * Form callback: allows the user to void a transaction.
+ */
+function commerce_stripe_void_form($form, &$form_state, $order, $transaction) {
+  $form_state['order'] = $order;
+  $form_state['transaction'] = $transaction;
+
+  // Load and store the payment method instance for this transaction.
+  $payment_method = commerce_payment_method_instance_load($transaction->instance_id);
+  $form_state['payment_method'] = $payment_method;
+
+  $form['markup'] = array(
+    '#markup' => t('Are you sure that you want to void this transaction?'),
+  );
+
+  $form = confirm_form($form,
+    t('Are you sure that you want to void this transaction?'),
+    'admin/commerce/orders/' . $order->order_id . '/payment',
+    '',
+    t('Void'),
+    t('Cancel'),
+    'confirm'
+  );
+
+  return $form;
+}
+
+/**
+ * Submit handler: process the void request.
+ * This is only accessible on uncaptured charge. If a user wishes to
+ * cancel a captured transaction, they need to credit the account
+ *
+ * According to stripe, you can perform a refund on an uncaptured charge,
+ * however, it must be for the full amount.
+ */
+function commerce_stripe_void_form_submit($form, &$form_state) {
+  $transaction = $form_state['transaction'];
+  $order = $form_state['order'];
+
+  if (!commerce_stripe_load_library()) {
+    drupal_set_message(t('Error voiding payment. Please contact shop admin to proceed.'), 'error');
+    drupal_goto('admin/commerce/orders/' . $form_state['order']->order_id . '/payment');
+  }
+  $payment_method = $form_state['payment_method'];
+
+  _commerce_stripe_set_api_key($payment_method);
+
+  try {
+    $charge = Stripe\Charge::retrieve($transaction->remote_id);
+
+    $response = $charge->refunds->create();
+
+    $transaction->payload[REQUEST_TIME] = $response->__toJSON();
+    $transaction->remote_status = commerce_stripe_get_remote_status(NULL, $transaction, 'void');
+    $transaction->message .= '<br />' . t('Voided: @date', array('@date' => format_date(REQUEST_TIME, 'short')));
+    // Set the status to failure so that it isn't used for order balance
+    // calculations.
+    $transaction->status = COMMERCE_PAYMENT_STATUS_FAILURE;
+    $transaction->amount = 0;
+    commerce_payment_transaction_save($transaction);
+  }
+  catch (Exception $e) {
+    drupal_set_message(t('We received the following error when trying to capture the transaction.'), 'error');
+    drupal_set_message(check_plain($e->getMessage()), 'error');
+    watchdog('commerce_stripe', 'Following error received when processing card for capture @stripe_error.', array('@stripe_error' => $e->getMessage()), WATCHDOG_NOTICE);
+
+    $transaction->payload[REQUEST_TIME] = $e->json_body;
+    $transaction->message = t('Capture processing error: @stripe_error', array('@stripe_error' => $e->getMessage()));
+    $transaction->status = COMMERCE_PAYMENT_STATUS_FAILURE;
+    $transaction->remote_status = 'FAILED';
+    commerce_payment_transaction_save($transaction);
+  }
+
+  $form_state['redirect'] = 'admin/commerce/orders/' . $order->order_id . '/payment';
+}

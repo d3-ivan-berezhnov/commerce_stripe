@@ -34,6 +34,31 @@ function commerce_stripe_menu() {
     'weight' => 1,
     'file' => 'includes/commerce_stripe.admin.inc',
   );
+
+  $items['admin/commerce/orders/%commerce_order/payment/%commerce_payment_transaction/stripe-capture'] = array(
+    'title' => 'Capture',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('commerce_stripe_capture_form', 3, 5),
+    'access callback' => 'commerce_stripe_capture_access',
+    'access arguments' => array(3, 5),
+    'type' => MENU_DEFAULT_LOCAL_TASK,
+    'context' => MENU_CONTEXT_INLINE,
+    'weight' => 2,
+    'file' => 'includes/commerce_stripe.admin.inc',
+  );
+
+  $items['admin/commerce/orders/%commerce_order/payment/%commerce_payment_transaction/stripe-void'] = array(
+    'title' => 'Void',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('commerce_stripe_void_form', 3, 5),
+    'access callback' => 'commerce_stripe_void_access',
+    'access arguments' => array(3, 5),
+    'type' => MENU_DEFAULT_LOCAL_TASK,
+    'context' => MENU_CONTEXT_INLINE,
+    'weight' => 2,
+    'file' => 'includes/commerce_stripe.admin.inc',
+  );
+
   return $items;
 }
 
@@ -143,6 +168,11 @@ function commerce_stripe_return_access($order, $transaction) {
 
   // Only allow refunds on original charge transactions.
   if (!empty($transaction->data['stripe']['stripe_refund'])) {
+    return FALSE;
+  }
+
+  // Don't allow refunds on AUTH_ONLY transactions.
+  if (isset($transaction->remote_status) && $transaction->remote_status == 'AUTH_ONLY') {
     return FALSE;
   }
 
@@ -302,6 +332,17 @@ function commerce_stripe_settings_form($settings) {
       '#markup' => t('To enable Card on File functionality, download and install the Commerce Card on File module.'),
     );
   }
+
+  $form['txn_type'] = array(
+    '#type' => 'radios',
+    '#title' => t('Default credit card transaction type'),
+    '#description' => t('The default will be used to process transactions during checkout.'),
+    '#options' => array(
+      COMMERCE_CREDIT_AUTH_CAPTURE => t('Authorization and capture'),
+      COMMERCE_CREDIT_AUTH_ONLY => t('Authorization only (requires manual capture after checkout)'),
+    ),
+    '#default_value' => isset($settings['txn_type']) ? $settings['txn_type'] : COMMERCE_CREDIT_AUTH_CAPTURE,
+  );
 
   return $form;
 }
@@ -482,6 +523,8 @@ function commerce_stripe_submit_form_submit($payment_method, $pane_form, $pane_v
     return FALSE;
   }
 
+  $txn_capture_bool = _commerce_stripe_get_txn_capture_bool($payment_method, $pane_values);
+
   // Begin assembling charge parameters.
   _commerce_stripe_set_api_key($payment_method);
 
@@ -499,6 +542,7 @@ function commerce_stripe_submit_form_submit($payment_method, $pane_form, $pane_v
     'amount' => $charge['amount'],
     'currency' => $currency_code,
     'card' => $pane_values['stripe_token'],
+    'capture' => $txn_capture_bool,
     'description' => $description,
   );
 
@@ -555,8 +599,9 @@ function commerce_stripe_submit_form_submit($payment_method, $pane_form, $pane_v
       $response = Stripe\Charge::create($c);
       $transaction->remote_id = $response->id;
       $transaction->payload[REQUEST_TIME] = $response->__toJSON();
-      $transaction->message = t('Payment completed successfully.');
-      $transaction->status = COMMERCE_PAYMENT_STATUS_SUCCESS;
+      $transaction->message = commerce_stripe_get_txn_message_success($txn_capture_bool);
+      $transaction->status = commerce_stripe_get_txn_status($txn_capture_bool);
+      $transaction->remote_status = commerce_stripe_get_remote_status($txn_capture_bool);
       _commerce_stripe_commerce_payment_transaction_save($transaction);
     }
     // If the total is $0 we just put the card on file.
@@ -577,6 +622,7 @@ function commerce_stripe_submit_form_submit($payment_method, $pane_form, $pane_v
     }
     $transaction->message = t('Card processing error: @stripe_error', array('@stripe_error' => $e->getMessage()));
     $transaction->status = COMMERCE_PAYMENT_STATUS_FAILURE;
+    $transaction->remote_status = 'FAILED';
     _commerce_stripe_commerce_payment_transaction_save($transaction);
     return FALSE;
   }
@@ -787,6 +833,8 @@ function commerce_stripe_cardonfile_charge($payment_method, $card_data, $order, 
   // Fetch the customer id and card id from $card_data->remote_id
   list($customer_id, $card_id) = explode('|', $card_data->remote_id);
 
+  $txn_capture_bool = _commerce_stripe_get_txn_capture_bool($payment_method, $payment_method['settings']);
+
   // Assemble charge parameters.
   _commerce_stripe_set_api_key($payment_method);
 
@@ -805,6 +853,7 @@ function commerce_stripe_cardonfile_charge($payment_method, $card_data, $order, 
     'currency' => $currency_code,
     'customer' => $customer_id,
     'card' => $card_id,
+    'capture' => $txn_capture_bool,
     'description' => $description,
   );
 
@@ -831,8 +880,9 @@ function commerce_stripe_cardonfile_charge($payment_method, $card_data, $order, 
       $response = Stripe\Charge::create($c);
       $transaction->remote_id = $response->id;
       $transaction->payload[REQUEST_TIME] = $response->__toJSON();
-      $transaction->message = t('Payment completed successfully.');
-      $transaction->status = COMMERCE_PAYMENT_STATUS_SUCCESS;
+      $transaction->message = commerce_stripe_get_txn_message_success($txn_capture_bool);
+      $transaction->status = commerce_stripe_get_txn_status($txn_capture_bool);
+      $transaction->remote_status = commerce_stripe_get_remote_status($txn_capture_bool);
       _commerce_stripe_commerce_payment_transaction_save($transaction);
       lock_release($lock);
       return TRUE;
@@ -852,6 +902,7 @@ function commerce_stripe_cardonfile_charge($payment_method, $card_data, $order, 
     }
     $transaction->message = t('Card processing error: @stripe_error', array('@stripe_error' => $e->getMessage()));
     $transaction->status = COMMERCE_PAYMENT_STATUS_FAILURE;
+    $transaction->remote_status = 'FAILED';
     _commerce_stripe_commerce_payment_transaction_save($transaction);
     lock_release($lock);
     return FALSE;
@@ -1512,6 +1563,16 @@ function commerce_stripe_form_commerce_payment_order_transaction_add_form_alter(
       return;
     }
 
+    $form['payment_terminal']['payment_details']['txn_type'] = array(
+      '#type' => 'select',
+      '#title' => t('Transaction type'),
+      '#options' => array(
+        COMMERCE_CREDIT_AUTH_ONLY => t('Authorization only'),
+        COMMERCE_CREDIT_AUTH_CAPTURE => t('Authorization and capture'),
+      ),
+      '#default_value' => $form_state['payment_method']['settings']['txn_type'],
+    );
+
     $form['payment_terminal']['commerce_stripe_terminal'] = array(
       '#value' => 1,
       '#type' => 'hidden',
@@ -1554,4 +1615,173 @@ function _commerce_stripe_elements_form() {
   );
 
   return $form;
+}
+
+/**
+ * Access callback for processing capture.
+ *
+ * @param stdClass $order
+ *  The commerce order entity.
+ * @param stdClass $transaction
+ *  The commerce payment transaction entity.
+ *
+ * @return bool
+ *   Return TRUE if the user can update the transaction.
+ */
+function commerce_stripe_capture_access($order, $transaction) {
+  // Return FALSE if the transaction isn't for Commerce Stripe or isn't
+  // awaiting capture.  This is detected by the AUTH_ONLY status
+  if ($transaction->payment_method != 'commerce_stripe' || empty($transaction->remote_id) ||
+    strtoupper($transaction->remote_status) != 'AUTH_ONLY') {
+    return FALSE;
+  }
+
+   // Return FALSE if it is more than 7 days past the original authorization.
+   // Stripe does not allow capture after this time
+   if (time() - $transaction->created > 86400 * 7) {
+     return FALSE;
+  }
+
+   // Allow access if the user can update this transaction.
+   return commerce_payment_transaction_access('update', $transaction);
+ }
+
+
+ /**
+  * Access callback for voiding transactions.
+  *
+  * @param stdClass $order
+  *  The commerce_order entity.
+  * @param stdClass $transaction
+  *  The commerce payment transaction entity.
+  *
+  * @return bool
+  *  Return TRUE if the user can update the transaction.
+  *
+  */
+function commerce_stripe_void_access($order, $transaction) {
+  // Only auth_only transactions can be voided.
+  if ($transaction->payment_method != 'commerce_stripe' || empty($transaction->remote_id) ||
+    strtoupper($transaction->remote_status) != 'AUTH_ONLY') {
+    return FALSE;
+  }
+
+  // Allow access if the user can update this transaction.
+  return commerce_payment_transaction_access('update', $transaction);
+}
+
+/**
+ * Used in commerce_stripe_submit_form_submit to get the capture flag for the
+ * charge.
+ *
+ * @param array $payment_method
+ *  An array containing the payment_method information.
+ * @param array $pane_values
+ *  An array containing values from the Commerce Stripe payment pane.
+ *
+ * @return bool
+ *  Returns TRUE if capture is set & FALSE for auth only.
+ */
+function _commerce_stripe_get_txn_capture_bool($payment_method, $pane_values) {
+  $txn_type = $payment_method['settings']['txn_type'];
+  // This handles the case when we are in the payment terminal. The
+  // $pane_values contains which type of transaction chosen
+  if (!empty($pane_values['txn_type'])) {
+    $txn_type = $pane_values['txn_type'];
+  }
+
+  // The capture flag in the charge takes a boolean. This simply
+  // translates the txn constants to a bool.
+  if ($txn_type == COMMERCE_CREDIT_AUTH_CAPTURE) {
+    return TRUE;
+  }
+  else {
+    if ($txn_type == COMMERCE_CREDIT_AUTH_ONLY) {
+      return FALSE;
+    }
+  }
+  return NULL;
+}
+
+/**
+ * Get the transactions remote status.
+ *
+ * @param bool $txn_capture_bool
+ *  Indicates whether or not the payment was captured.
+ * @param stdClass $prev_transaction
+ *  The previous transaction entity.
+ * @param string $action
+ *  The operation being performed on the transaction.
+ *
+ * @return string
+ *  The remote status.
+ * @throws Exception
+ */
+function commerce_stripe_get_remote_status($txn_capture_bool, $prev_transaction = NULL, $action = NULL) {
+  // This is the case that a new charge is being created.
+  if (!$prev_transaction) {
+    if ($txn_capture_bool === FALSE) {
+      return 'AUTH_ONLY';
+    }
+    else {
+      if ($txn_capture_bool === TRUE) {
+        return 'AUTH_CAPTURE';
+      }
+    }
+  }
+  else {
+    // An administrator is acting upon a previous transaction in the admin ui
+    // in order to capture or void.
+    switch ($action) {
+      case 'capture':
+        if ($prev_transaction->remote_status == 'AUTH_ONLY') {
+          return 'PRIOR_AUTH_CAPTURE';
+        }
+        else {
+          //This means that internally this function has been called improperly by
+          //the programmer.
+          throw new Exception(t('Remote Status capture improperly used internally.'));
+        }
+        break;
+
+      case 'void':
+        if ($prev_transaction->remote_status == 'AUTH_ONLY') {
+          return 'VOID';
+        }
+        else {
+          // This means that internally this function has been called improperly by
+          // the programmer.
+          throw new Exception(t('Remote Status void improperly used internally.'));
+        }
+        break;
+    }
+  }
+  return 'FAILED';
+}
+
+/**
+ * A different success message needs to be displayed depending on whether the
+ * transaction is a authorization only transaction, or an auth capture transaction.
+ *
+ * @param bool $txn_capture_bool
+ *  Indicates whether or not the payment was captured.
+ *
+ * @return string
+ *  A success message for the strip transaction.
+ */
+function commerce_stripe_get_txn_message_success($txn_capture_bool) {
+  return ($txn_capture_bool) ? t('Payment completed successfully.') : t('Payment information authorized successfully.');
+}
+
+/**
+ * Gets commerce_payment transaction status from capture boolean.
+ *
+ * @param bool $txn_capture_bool
+ *  Indicates whether or not the payment was captured.
+ *
+ * @return string
+ *  The transaction status.
+ */
+function commerce_stripe_get_txn_status($txn_capture_bool) {
+  return ($txn_capture_bool) ? COMMERCE_PAYMENT_STATUS_SUCCESS : COMMERCE_PAYMENT_STATUS_PENDING;
 }
