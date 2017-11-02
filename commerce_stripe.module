@@ -1535,7 +1535,7 @@ function _commerce_stripe_elements_form() {
     $form['credit_card']['owner'] = array(
       '#type' => 'textfield',
       '#title' => t('Card owner'),
-      '#attributes' => array('autocomplete' => 'off', 'placeholder' => t('Mortimer T. Clankitybritches')),
+      '#attributes' => array('autocomplete' => 'off', 'placeholder' => variable_get('commerce_stripe_owner_placeholder', 'John Q. Smith')),
       '#required' => TRUE,
       '#maxlength' => 64,
       '#size' => 32,
