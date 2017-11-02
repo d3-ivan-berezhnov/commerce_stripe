@@ -1442,6 +1442,7 @@ function commerce_stripe_load_library() {
     watchdog('commerce_stripe', 'Failure to load Stripe API PHP Client Library. Please see the Status Report for more.', array(), WATCHDOG_CRITICAL);
     return FALSE;
   }
+  return TRUE;
 }
 
 /**
