@@ -10,6 +10,13 @@
 define('COMMERCE_STRIPE_DEFAULT_INTEGRATION', 'stripejs');
 
 /**
+ * Implements hook_init().
+ */
+function commerce_stripe_init() {
+  drupal_add_js('https://js.stripe.com/v3/', 'external');
+}
+
+/**
  * Implements hook_menu().
  */
 function commerce_stripe_menu() {
@@ -866,7 +873,7 @@ function commerce_stripe_cardonfile_create_form($form, &$form_state, $op, $card_
   $stripe_integration = _commerce_stripe_load_setting('integration_type', COMMERCE_STRIPE_DEFAULT_INTEGRATION);
   if ($stripe_integration === 'stripejs') {
     _commerce_stripe_form_add_credit_card_form($form);
-
+    drupal_add_js('https://js.stripe.com/v2/', 'external');
     $form['submit'] = array(
       '#type' => 'submit',
       '#value' => t('Add card')
@@ -1042,16 +1049,16 @@ function _commerce_stripe_form_configure_stripe_common(&$form, $stripe_token, $i
 
   if ($integration_type === 'elements') {
     $form['#attached']['js'] = array(
-      '//js.stripe.com/v3/' => array('type' => 'external'),
       drupal_get_path('module', 'commerce_stripe') . '/commerce_stripe.elements.js' =>
-        array('preprocess' => FALSE, 'defer' => TRUE, 'cache' => FALSE),
+        array('preprocess' => FALSE, 'cache' => FALSE),
     );
   }
   elseif ($integration_type === 'checkout') {
     // Add external checkout.js library.
     drupal_add_js('https://checkout.stripe.com/checkout.js', 'external');
   }
-  else {
+
+  if ($integration_type == 'stripejs') {
     $form['#attached']['js'] = array(
       'https://js.stripe.com/v2/' => array('type' => 'external'),
       drupal_get_path('module', 'commerce_stripe') . '/commerce_stripe.js' =>
