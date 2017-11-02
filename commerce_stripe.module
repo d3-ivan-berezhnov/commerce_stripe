@@ -7,7 +7,7 @@
  * straight from you Commerce shop.
  */
 
-define('STRIPE_DEFAULT_INTEGRATION', 'stripejs');
+define('COMMERCE_STRIPE_DEFAULT_INTEGRATION', 'stripejs');
 
 /**
  * Implements hook_menu().
@@ -67,7 +67,7 @@ function commerce_stripe_commerce_payment_method_info() {
   // Note that this code is intentionally duplicated to avoid the infinite
   // recursion that would occur if we called _commerce_stripe_load_settings().
   // @todo: Explore using a static variable to avoid that recursion.
-  $stripe_integration = STRIPE_DEFAULT_INTEGRATION;
+  $stripe_integration = COMMERCE_STRIPE_DEFAULT_INTEGRATION;
   $cardonfile = FALSE;
 
   $payment_method_rule = rules_config_load('commerce_payment_commerce_stripe');
@@ -197,8 +197,8 @@ function commerce_stripe_settings_form($settings) {
     '#type' => 'select',
     '#title' => t('Integration type'),
     '#description' => t('Choose Stripe integration method: Stripe.js makes it easy to collect credit card (and other similarly sensitive) details without having the information touch your server.  Checkout is an embeddable iframe for desktop, tablet, and mobile devices.'),
-    '#options' => array('stripejs' => t('stripe.js'), 'checkout' => t('checkout')),
-    '#default_value' => !empty($settings['integration_type']) ? $settings['integration_type'] : STRIPE_DEFAULT_INTEGRATION,
+    '#options' => array('elements' => t('Elements'), 'stripejs' => t('stripe.js'), 'checkout' => t('checkout')),
+    '#default_value' => !empty($settings['integration_type']) ? $settings['integration_type'] : COMMERCE_STRIPE_DEFAULT_INTEGRATION,
   );
   // Stripe Checkout specific settings.
   // @see: https://stripe.com/docs/checkout#integration-custom
@@ -351,7 +351,8 @@ function _commerce_stripe_credit_card_form() {
  * Payment method callback: checkout and terminal form.
  */
 function commerce_stripe_submit_form($payment_method, $pane_values, $checkout_pane, $order) {
-  $integration_type = !empty($payment_method['settings']['integration_type']) ? $payment_method['settings']['integration_type'] : STRIPE_DEFAULT_INTEGRATION;
+  $integration_type = !empty($payment_method['settings']['integration_type']) ? $payment_method['settings']['integration_type'] : COMMERCE_STRIPE_DEFAULT_INTEGRATION;
+
   $order_wrapper = entity_metadata_wrapper('commerce_order', $order);
   $field = field_info_field('commerce_customer_address');
   $instance = field_info_instance('commerce_customer_profile', 'commerce_customer_address', 'billing');
@@ -369,8 +370,8 @@ function commerce_stripe_submit_form($payment_method, $pane_values, $checkout_pa
     }
   }
 
-  // Pass the billing address values to javacript so they can be included in
-  // the token request to Stripe.
+  // Pass the billing address values to JS, so they can be included in
+  // the token creation sent to Stripe.
   $address = array(
     'address_line1' => !empty($billing_address['thoroughfare']) ? $billing_address['thoroughfare'] : '',
     'address_line2' => !empty($billing_address['premise']) ? $billing_address['premise'] : '',
@@ -378,10 +379,12 @@ function commerce_stripe_submit_form($payment_method, $pane_values, $checkout_pa
     'address_state' => !empty($billing_address['administrative_area']) ? $billing_address['administrative_area'] : '',
     'address_zip' => !empty($billing_address['postal_code']) ? $billing_address['postal_code'] : '',
     'address_country' => !empty($billing_address['country']) ? $billing_address['country'] : '',
+    'name' => !empty($billing_address['name_line']) ? $billing_address['name_line'] : '',
   );
+  // Store them in Drupal.settings for easier access.
   drupal_add_js(array('commerce_stripe_address' => $address), array('type' => 'setting'));
 
-  if ($integration_type == 'checkout' && isset($checkout_pane)) {
+  if ($integration_type === 'checkout' && isset($checkout_pane)) {
     $form = array();
 
     // Add pay button.
@@ -421,41 +424,17 @@ function commerce_stripe_submit_form($payment_method, $pane_values, $checkout_pa
     );
 
     drupal_add_js(array('stripe' => array('checkout' => $checkout_settings)), 'setting');
-
-    // Add external checkout.js library.
-    drupal_add_js('https://checkout.stripe.com/checkout.js', 'external');
   }
-  else {
+  elseif ($integration_type === 'elements' && (empty($pane_values) || !is_numeric($pane_values['payment_details']['cardonfile']))) {
+    $form = _commerce_stripe_elements_form();
+  }
+  elseif ($integration_type === 'stripejs' && (empty($pane_values) || !is_numeric($pane_values['payment_details']['cardonfile']))) {
     $form = _commerce_stripe_credit_card_form();
-    // Include the stripe.js from stripe.com.
-    drupal_add_js('https://js.stripe.com/v2/', 'external');
   }
 
-  // @todo: Use _commerce_stripe_form_configure_stripe_common().
-  // Add stripe token field. This field is a container for token received from
-  // Stripe API.
-  $form['stripe_token'] = array(
-    '#type' => 'hidden',
-    '#attributes' => array('id' => 'stripe_token'),
-    '#default_value' => !empty($pane_values['stripe_token']) ? $pane_values['stripe_token'] : '',
-  );
-
-
-  // Set our key to settings array.
-  drupal_add_js(
-    array(
-      'stripe' => array(
-        'publicKey' => trim($payment_method['settings']['public_key']),
-        'integration_type' => $integration_type,
-      ),
-    ),
-    'setting'
-  );
-
-  // Load commerce_stripe.js.
-  $form['#attached']['js'] = array(
-    drupal_get_path('module', 'commerce_stripe') . '/commerce_stripe.js',
-  );
+  // Stripe token should be empty? Need to store it in form storage to prevent overwriting during FAPI.
+  $stripe_token = !empty($pane_values['stripe_token']) ? check_plain(trim($pane_values['stripe_token'])) : '';
+  _commerce_stripe_form_configure_stripe_common($form, $stripe_token, $integration_type);
 
   // To display validation errors.
   $form['errors'] = array(
@@ -884,13 +863,21 @@ function commerce_stripe_cardonfile_create_form($form, &$form_state, $op, $card_
   $form['op'] = array('#type' => 'value', '#value' => $op);
   $form['user'] = array('#type' => 'value', '#value' => $account);
 
-  $stripe_integration = _commerce_stripe_load_setting('integration_type', STRIPE_DEFAULT_INTEGRATION);
+  $stripe_integration = _commerce_stripe_load_setting('integration_type', COMMERCE_STRIPE_DEFAULT_INTEGRATION);
   if ($stripe_integration === 'stripejs') {
     _commerce_stripe_form_add_credit_card_form($form);
 
     $form['submit'] = array(
       '#type' => 'submit',
       '#value' => t('Add card')
+    );
+  }
+  elseif ($stripe_integration === 'elements') {
+    $form += _commerce_stripe_elements_form();
+
+    $form['submit'] = array(
+      '#type' => 'submit',
+      '#value' => t('Add card'),
     );
   }
   elseif ($stripe_integration === 'checkout') {
@@ -923,7 +910,7 @@ function commerce_stripe_cardonfile_create_form($form, &$form_state, $op, $card_
 
   $public_key = _commerce_stripe_load_setting('public_key');
   $stripe_token = !empty($form_state['values']['stripe_token']) ? $form_state['values']['stripe_token'] : '';
-  _commerce_stripe_form_configure_stripe_common($form, $stripe_token, $public_key, $stripe_integration);
+  _commerce_stripe_form_configure_stripe_common($form, $stripe_token, $stripe_integration);
 
   $payment_method = commerce_payment_method_instance_load($card_data->instance_id);
 
@@ -1042,8 +1029,10 @@ function _commerce_stripe_form_configure_stripe_checkout($checkout_settings, $ch
  * @param $public_key
  * @param $integration_type
  */
-function _commerce_stripe_form_configure_stripe_common(&$form, $stripe_token, $public_key, $integration_type) {
-// Add stripe token field. This field is a container for token received from
+function _commerce_stripe_form_configure_stripe_common(&$form, $stripe_token, $integration_type = COMMERCE_STRIPE_DEFAULT_INTEGRATION) {
+  $public_key = _commerce_stripe_load_setting('public_key');
+
+  // Add stripe token field. This field is a container for token received from
   // Stripe API's response handler.
   $form['stripe_token'] = array(
     '#type' => 'hidden',
@@ -1051,20 +1040,33 @@ function _commerce_stripe_form_configure_stripe_common(&$form, $stripe_token, $p
     '#default_value' => !empty($stripe_token) ? $stripe_token : '',
   );
 
-  // Set our key to settings array.
-  drupal_add_js(
-    array(
+  if ($integration_type === 'elements') {
+    $form['#attached']['js'] = array(
+      '//js.stripe.com/v3/' => array('type' => 'external'),
+      drupal_get_path('module', 'commerce_stripe') . '/commerce_stripe.elements.js' =>
+        array('preprocess' => FALSE, 'defer' => TRUE, 'cache' => FALSE),
+    );
+  }
+  elseif ($integration_type === 'checkout') {
+    // Add external checkout.js library.
+    drupal_add_js('https://checkout.stripe.com/checkout.js', 'external');
+  }
+  else {
+    $form['#attached']['js'] = array(
+      'https://js.stripe.com/v2/' => array('type' => 'external'),
+      drupal_get_path('module', 'commerce_stripe') . '/commerce_stripe.js' =>
+        array('preprocess' => FALSE, 'defer' => TRUE, 'cache' => FALSE),
+    );
+  }
+
+  $form['#attached']['js'][] = array(
+    'data' => array(
       'stripe' => array(
         'publicKey' => trim($public_key),
         'integration_type' => $integration_type,
       ),
     ),
-    'setting'
-  );
-
-  // Load commerce_stripe.js.
-  $form['#attached']['js'] = array(
-    drupal_get_path('module', 'commerce_stripe') . '/commerce_stripe.js',
+    'type' => 'setting',
   );
 }
 
@@ -1395,7 +1397,7 @@ function commerce_stripe_load_library() {
  * @return mixed
  *   The customer id if one was found, otherwise FALSE
  */
-function commerce_stripe_customer_id($uid, $instance_id) {
+function commerce_stripe_customer_id($uid, $instance_id = NULL) {
   $stored_cards = commerce_cardonfile_load_multiple_by_uid($uid, $instance_id);
   if (!empty($stored_cards)) {
     $card_data = reset($stored_cards);
@@ -1508,4 +1510,45 @@ function commerce_stripe_form_commerce_payment_order_transaction_add_form_alter(
       '#type' => 'hidden',
     );
   }
+}
+
+/**
+ * Callback for the Stripe Elements form.
+ */
+function _commerce_stripe_elements_form() {
+  $form = [];
+  $form['credit_card'] = array(
+    '#tree' => TRUE,
+    '#attached' => array(
+      'css' => array(drupal_get_path('module', 'commerce_payment') . '/theme/commerce_payment.theme.css'),
+    ),
+  );
+  // Add a field for the credit card owner if specified.
+  if (isset($fields['owner'])) {
+    $form['credit_card']['owner'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Card owner'),
+      '#attributes' => array('autocomplete' => 'off', 'placeholder' => t('Mortimer T. Clankitybritches')),
+      '#required' => TRUE,
+      '#maxlength' => 64,
+      '#size' => 32,
+    );
+  }
+  $form['credit_card']['number'] = array(
+    '#attached' => array(
+      'js' => array(
+        drupal_get_path('module', 'commerce_stripe') . '/commerce_stripe.elements.js' =>
+          array('preprocess' => FALSE, 'defer' => TRUE, 'cache' => FALSE),
+      ),
+    ),
+    '#type' => 'item',
+    '#markup' => '<label for="card-element">Card number</label><div data-stripe="number" id="card-element"></div>',
+  );
+  $form['card_errors'] = array(
+    '#type' => 'item',
+    '#markup' => '<div data-stripe-errors="number" class="stripe-errors form-text" id="card-errors"></div>',
+    '#weight' => 0,
+  );
+
+  return $form;
 }
