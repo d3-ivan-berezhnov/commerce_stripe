@@ -10,6 +10,7 @@
      *   An object containing settings for the current context.
      */
     attach: function (context, settings)  {
+      var self = this;
       if (typeof settings.stripe !== 'undefined') {
         // Create an instance of Stripe Elements
         var stripe = Stripe(settings.stripe.publicKey);
@@ -23,10 +24,10 @@
           }
         };
 
-        $("#card-element:not('processed')").once('processed', function() {
+        $("#card-element").once('elements', function() {
           // Create an instance of the card Element
-          var card = elements.create('card', {style: style});
-          card.mount(this);
+          self.card = elements.create('card', {style: style});
+          self.card.mount(this);
 
           // Attach the JS behaviors just once to the available card element.
           $('body').delegate('.checkout-buttons #edit-continue', 'click', function(event) {
@@ -81,7 +82,7 @@
                     return;
                   }
                 }
-                stripe.createToken(card, Drupal.behaviors.commerce_stripe_elements.extractTokenData(form$)).then(function (result) {
+                stripe.createToken(self.card, Drupal.behaviors.commerce_stripe_elements.extractTokenData(form$)).then(function (result) {
                   if (result.error) {
                     // console.log('There was an error');
                     // console.log(result.error.message);
@@ -161,7 +162,7 @@
                 return;
               }
             }
-            stripe.createToken(card, Drupal.behaviors.commerce_stripe_elements.extractTokenData(form$)).then(function(result) {
+            stripe.createToken(self.card, Drupal.behaviors.commerce_stripe_elements.extractTokenData(form$)).then(function(result) {
               if (result.error) {
                 // console.log('There was an error');
                 // console.log(result.error.message);
@@ -226,7 +227,7 @@
                 name: 'edit-payment-details-credit-card-owner'
               };
 
-              stripe.createToken(card, Drupal.behaviors.commerce_stripe_elements.extractTokenData(form$)).then(function(result) {
+              stripe.createToken(self.card, Drupal.behaviors.commerce_stripe_elements.extractTokenData(form$)).then(function(result) {
                 if (result.error) {
                   // console.log('There was an error');
                   // console.log(result.error.message);
@@ -271,7 +272,7 @@
             }
           });
 
-          card.addEventListener('change', function (event) {
+          self.card.addEventListener('change', function (event) {
             var displayError = $('#card-errors');
             var submitButton$ = $('#edit-submit');
             var submit_text = submitButton$.val();
@@ -296,8 +297,6 @@
     detach: function(context, settings, trigger) {
 
       if (trigger === 'unload') {
-
-
         // Remove error message for unloaded Stripe inputs.
         $("#card-errors").removeClass('messages');
         $("#card-errors").removeClass('error');
