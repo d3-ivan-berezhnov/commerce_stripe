@@ -1528,10 +1528,6 @@ function _commerce_stripe_elements_form() {
     '#tree' => TRUE,
     '#attached' => array(
       'css' => array(drupal_get_path('module', 'commerce_payment') . '/theme/commerce_payment.theme.css'),
-      'js' => array(
-        drupal_get_path('module', 'commerce_stripe') . '/commerce_stripe.elements.js' =>
-          array('preprocess' => FALSE, 'cache' => FALSE),
-      ),
     ),
   );
   // Add a field for the credit card owner if specified.
