@@ -1528,6 +1528,10 @@ function _commerce_stripe_elements_form() {
     '#tree' => TRUE,
     '#attached' => array(
       'css' => array(drupal_get_path('module', 'commerce_payment') . '/theme/commerce_payment.theme.css'),
+      'js' => array(
+        drupal_get_path('module', 'commerce_stripe') . '/commerce_stripe.elements.js' =>
+          array('preprocess' => FALSE, 'cache' => FALSE),
+      ),
     ),
   );
   // Add a field for the credit card owner if specified.
@@ -1542,12 +1546,6 @@ function _commerce_stripe_elements_form() {
     );
   }
   $form['credit_card']['number'] = array(
-    '#attached' => array(
-      'js' => array(
-        drupal_get_path('module', 'commerce_stripe') . '/commerce_stripe.elements.js' =>
-          array('preprocess' => FALSE, 'cache' => FALSE),
-      ),
-    ),
     '#type' => 'item',
     '#markup' => '<label for="card-element">Card number</label><div data-stripe="number" id="card-element"></div>',
   );
