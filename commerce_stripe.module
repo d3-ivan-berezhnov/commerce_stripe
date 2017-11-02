@@ -7,7 +7,7 @@
  * straight from you Commerce shop.
  */
 
-define('COMMERCE_STRIPE_DEFAULT_INTEGRATION', 'stripejs');
+define('COMMERCE_STRIPE_DEFAULT_INTEGRATION', 'elements');
 
 /**
  * Implements hook_init().
@@ -1062,7 +1062,7 @@ function _commerce_stripe_form_configure_stripe_common(&$form, $stripe_token, $i
     $form['#attached']['js'] = array(
       'https://js.stripe.com/v2/' => array('type' => 'external'),
       drupal_get_path('module', 'commerce_stripe') . '/commerce_stripe.js' =>
-        array('preprocess' => FALSE, 'defer' => TRUE, 'cache' => FALSE),
+        array('preprocess' => FALSE, 'cache' => FALSE),
     );
   }
 
@@ -1545,7 +1545,7 @@ function _commerce_stripe_elements_form() {
     '#attached' => array(
       'js' => array(
         drupal_get_path('module', 'commerce_stripe') . '/commerce_stripe.elements.js' =>
-          array('preprocess' => FALSE, 'defer' => TRUE, 'cache' => FALSE),
+          array('preprocess' => FALSE, 'cache' => FALSE),
       ),
     ),
     '#type' => 'item',
