@@ -8,6 +8,9 @@
  */
 
 define('COMMERCE_STRIPE_DEFAULT_INTEGRATION', 'elements');
+define('COMMERCE_STRIPE_API_LATEST_TESTED', '2017-08-15');
+define('COMMERCE_STRIPE_API_ACCOUNT_DEFAULT', 'Account Default');
+define('COMMERCE_STRIPE_API_VERSION_CUSTOM', 'Custom');
 
 /**
  * Implements hook_init().
@@ -83,8 +86,55 @@ function commerce_stripe_libraries_info() {
           'init.php',
         ),
       ),
+      'callbacks' => array(
+        'post-load' => array(
+          'commerce_stripe_libraries_postload_callback',
+        ),
+      ),
     ),
   );
+}
+
+/**
+ * Post-load callback for the Stripe PHP Library.
+ *
+ * @param array $library
+ *   An array of library information.
+ * @param string $version
+ *   If the $library array belongs to a certain version, a string containing the
+ *   version.
+ * @param string $variant
+ *   If the $library array belongs to a certain variant, a string containing the
+ *   variant name.
+ */
+function commerce_stripe_libraries_postload_callback($library, $version = NULL, $variant = NULL) {
+  if (!empty($library['loaded'])) {
+    // @todo: Make this a global configuration, since merchants will only have one API key.
+    $payment_method = commerce_payment_method_instance_load('commerce_stripe|commerce_payment_commerce_stripe');
+    \Stripe\Stripe::setApiKey(trim($payment_method['settings']['secret_key']));
+
+    // If configured to, set the API Version for all requests.
+    // Because the default is the version configured in the Stripe
+    // Account dashboard, we only set the version if something else
+    // has been configured by an administrator.
+    $api_version = $payment_method['settings']['commerce_stripe_api_version'];
+    if ($api_version <> COMMERCE_STRIPE_API_ACCOUNT_DEFAULT) {
+      if ($api_version == COMMERCE_STRIPE_API_VERSION_CUSTOM) {
+        $api_version = check_plain($payment_method['settings']['commerce_stripe_api_version_custom']);
+      }
+
+      try {
+        \Stripe\Stripe::setApiVersion($api_version);
+      }
+      catch (\Stripe\Error\InvalidRequest $e) {
+        watchdog('stripe', 'Stripe setApiVersion Exception: %error',
+          array('%error' => $e->getMessage()), WATCHDOG_ERROR);
+
+        drupal_set_message(t('Stripe API Error: :error',
+          array(':error' => $e->getMessage())), 'error');
+      }
+    }
+  }
 }
 
 /**
@@ -344,6 +394,36 @@ function commerce_stripe_settings_form($settings) {
     '#default_value' => isset($settings['txn_type']) ? $settings['txn_type'] : COMMERCE_CREDIT_AUTH_CAPTURE,
   );
 
+  $form['commerce_stripe_api_version'] = array(
+    '#type' => 'select',
+    '#title' => t('Stripe API Version'),
+    '#options' => array(
+      COMMERCE_STRIPE_API_LATEST_TESTED => 'Latest Tested (2017-08-15)',
+      COMMERCE_STRIPE_API_ACCOUNT_DEFAULT => 'Account Default',
+      COMMERCE_STRIPE_API_VERSION_CUSTOM => 'Custom',
+    ),
+    '#empty_option' => COMMERCE_STRIPE_API_ACCOUNT_DEFAULT,
+    '#empty_value' => 'Account Default',
+    '#default_value' => $settings['commerce_stripe_api_version'],
+    '#description' => t('Specify the API version to use for requests.
+    Defaults to the version configured in your <a href="@dash">Stripe Account</a>.',
+      array('@dash' => 'http://dashboard.stripe.com/account/apikeys')),
+  );
+
+  $form['commerce_stripe_api_version_custom'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Specify an API Version'),
+    '#description' => t('Useful for testing API Versioning before committing to an upgrade. See the <a href="@docs">API Docs</a> and your <a href="@changelog">API Changelog</a>.',
+      array('@docs' => 'https://stripe.com/docs/upgrades', '@changelog' => 'https://stripe.com/docs/upgrades#api-changelog')),
+    '#default_value' => !empty($settings['commerce_stripe_api_version_custom']) ? $settings['commerce_stripe_api_version_custom'] : '',
+    '#size' => 12,
+    '#states' => array(
+      'visible' => array(
+        ':input[name$="[commerce_stripe_api_version]"]' => array('value' => COMMERCE_STRIPE_API_VERSION_CUSTOM),
+      ),
+    ),
+  );
+
   return $form;
 }
 
@@ -525,9 +605,6 @@ function commerce_stripe_submit_form_submit($payment_method, $pane_form, $pane_v
 
   $txn_capture_bool = _commerce_stripe_get_txn_capture_bool($payment_method, $pane_values);
 
-  // Begin assembling charge parameters.
-  _commerce_stripe_set_api_key($payment_method);
-
   // Build a default description and offer modules the possibility to alter it.
   $description = t('Order Number: @order_number', array('@order_number' => $order->order_number));
 
@@ -671,7 +748,6 @@ function _commerce_stripe_create_card($stripe_token, $account, $payment_method, 
   if (!commerce_stripe_load_library()) {
     return FALSE;
   }
-  _commerce_stripe_set_api_key($payment_method);
 
   // If there is no existing customer id, use the Stripe form token to create one.
   $stripe_customer_id = commerce_stripe_customer_id($account->uid, $payment_method['instance_id']);
@@ -746,8 +822,6 @@ function _commerce_stripe_save_cardonfile($card, $uid, $payment_method, $set_def
   }
 
   if (!empty($set_default)) {
-    _commerce_stripe_set_api_key($payment_method);
-
     try {
       $customer = Stripe\Customer::retrieve($card->customer);
       $customer->default_source = $card->id;
@@ -834,9 +908,6 @@ function commerce_stripe_cardonfile_charge($payment_method, $card_data, $order, 
   list($customer_id, $card_id) = explode('|', $card_data->remote_id);
 
   $txn_capture_bool = _commerce_stripe_get_txn_capture_bool($payment_method, $payment_method['settings']);
-
-  // Assemble charge parameters.
-  _commerce_stripe_set_api_key($payment_method);
 
   // Build a default description and offer modules the possibility to alter it.
   $description = t('Order Number: @order_number', array('@order_number' => $order->order_number));
@@ -1334,8 +1405,6 @@ function commerce_stripe_cardonfile_update($form, &$form_state, $payment_method,
   // Fetch the customer id and card id from $card_data->remote_id
   list($customer_id, $card_id) = explode('|', $card_data->remote_id);
 
-  _commerce_stripe_set_api_key($payment_method);
-
   try {
     $customer = Stripe\Customer::retrieve($customer_id);
     $card = $customer->sources->retrieve($card_id);
@@ -1418,8 +1487,6 @@ function commerce_stripe_cardonfile_delete($form, &$form_state, $payment_method,
 
   // Fetch the customer id and card id from $card_data->remote_id
   list($customer_id, $card_id) = explode('|', $card_data->remote_id);
-
-  _commerce_stripe_set_api_key($payment_method);
 
   try {
     $customer = Stripe\Customer::retrieve($customer_id);
@@ -1543,7 +1610,10 @@ function commerce_stripe_commerce_stripe_metadata($order) {
   );
 }
 
-// Helper function to set the API key.
+/**
+ * Helper function to set the API key.
+ * @deprecated
+ */
 // @todo: Use with a global config we can programmatically change (via Rules etc.)
 function _commerce_stripe_set_api_key($payment_method) {
   Stripe\Stripe::setApiKey(trim($payment_method['settings']['secret_key']));
