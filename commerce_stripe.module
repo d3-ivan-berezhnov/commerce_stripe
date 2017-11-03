@@ -13,7 +13,7 @@ define('COMMERCE_STRIPE_DEFAULT_INTEGRATION', 'elements');
  * Implements hook_init().
  */
 function commerce_stripe_init() {
-  drupal_add_js('https://js.stripe.com/v3/', 'external');
+  drupal_add_js('https://js.stripe.com/v3', 'external');
 }
 
 /**
