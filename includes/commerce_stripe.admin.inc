@@ -269,6 +269,8 @@ function commerce_stripe_capture_form_submit($form, &$form_state) {
     'amount' => $capture_amount,
   );
 
+  _commerce_stripe_set_api_key($payment_method);
+
   try {
     $charge = Stripe\Charge::retrieve($transaction->remote_id);
 
@@ -341,6 +343,8 @@ function commerce_stripe_void_form_submit($form, &$form_state) {
     drupal_goto('admin/commerce/orders/' . $form_state['order']->order_id . '/payment');
   }
   $payment_method = $form_state['payment_method'];
+
+  _commerce_stripe_set_api_key($payment_method);
 
   try {
     $charge = Stripe\Charge::retrieve($transaction->remote_id);
