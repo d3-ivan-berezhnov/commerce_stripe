@@ -1755,7 +1755,8 @@ function commerce_stripe_void_access($order, $transaction) {
  *  Returns TRUE if capture is set & FALSE for auth only.
  */
 function _commerce_stripe_get_txn_capture_bool($payment_method, $pane_values) {
-  $txn_type = $payment_method['settings']['txn_type'];
+  $txn_type = !empty($payment_method['settings']['txn_type']) ? $payment_method['settings']['txn_type'] : COMMERCE_CREDIT_AUTH_CAPTURE;
+
   // This handles the case when we are in the payment terminal. The
   // $pane_values contains which type of transaction chosen
   if (!empty($pane_values['txn_type'])) {
@@ -1772,7 +1773,8 @@ function _commerce_stripe_get_txn_capture_bool($payment_method, $pane_values) {
       return FALSE;
     }
   }
-  return NULL;
+  // Return TRUE by default.
+  return TRUE;
 }
 
 /**
