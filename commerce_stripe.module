@@ -822,6 +822,7 @@ function _commerce_stripe_save_cardonfile($card, $uid, $payment_method, $set_def
   }
 
   if (!empty($set_default)) {
+    commerce_stripe_load_library();
     try {
       $customer = Stripe\Customer::retrieve($card->customer);
       $customer->default_source = $card->id;

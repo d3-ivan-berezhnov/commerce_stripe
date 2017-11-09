@@ -77,6 +77,16 @@ function commerce_stripe_requirements($phase) {
 }
 
 /**
+ * Ensure libraries and registry caches are rebuilt to pick up changes.
+ */
+function commerce_stripe_update_7302() {
+  registry_rebuild();
+  foreach (libraries_flush_caches() as $table) {
+    cache_clear_all('*', $table, TRUE);
+  }
+}
+
+/**
  * Implements hook_uninstall().
  */
 function commerce_stripe_uninstall() {
