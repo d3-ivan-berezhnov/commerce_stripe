@@ -33,27 +33,24 @@ class PaymentMethodAddForm extends BasePaymentMethodAddForm {
     $element['card_number'] = [
       '#type' => 'item',
       '#title' => t('Card number'),
-      '#label_attributes' => [
-        'class' => ['js-form-required', 'form-required'],
-      ],
+      '#required' => TRUE,
+      '#validated' => TRUE,
       '#markup' => '<div id="card-number-element" class="form-text"></div>',
     ];
 
     $element['expiration'] = [
       '#type' => 'item',
       '#title' => t('Expiration date'),
-      '#label_attributes' => [
-        'class' => ['js-form-required', 'form-required'],
-      ],
+      '#required' => TRUE,
+      '#validated' => TRUE,
       '#markup' => '<div id="expiration-element"></div>',
     ];
 
     $element['security_code'] = [
       '#type' => 'item',
       '#title' => t('CVC'),
-      '#label_attributes' => [
-        'class' => ['js-form-required', 'form-required'],
-      ],
+      '#required' => TRUE,
+      '#validated' => TRUE,
       '#markup' => '<div id="security-code-element"></div>',
     ];
 
