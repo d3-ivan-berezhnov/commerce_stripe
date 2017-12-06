@@ -6,7 +6,7 @@ CONTENTS OF THIS FILE
 * Requirements
 * Installation
 * Configuration
-* How it works
+* How It Works
 * Troubleshooting
 * Maintainers
 
@@ -25,10 +25,10 @@ REQUIREMENTS
 ------------
 This module requires the following:
 * Submodules of Drupal Commerce package (https://drupal.org/project/commerce)
-  - Commerce core,
-  - Commerce Payment (and its dependencies);
-* Stripe PHP Library (https://github.com/stripe/stripe-php);
-* Stripe Merchant account (https://dashboard.stripe.com/register).
+  - Commerce core
+  - Commerce Payment (and its dependencies)
+* Stripe PHP Library (https://github.com/stripe/stripe-php)
+* Stripe Merchant account (https://dashboard.stripe.com/register)
 
 
 INSTALLATION
@@ -40,32 +40,35 @@ https://www.drupal.org/docs/8/extending-drupal-8/installing-modules-composer-dep
 
 CONFIGURATION
 -------------
-* Create new Stripe payment gateway
+* Create a new Stripe payment gateway.
   Administration > Commerce > Configuration > Payment gateways > Add payment gateway
-  Stripe specific settings available:
-  - Secret key.
-  - Publishable key.
-  All those API credentials are provided by the Stripe merchant account. It is
+  Stripe-specific settings available:
+  - Secret key
+  - Publishable key
+  Use the API credentials provided by your Stripe merchant account. It is
   recommended to enter test credentials and then override these with live
-  credentials in settings.php. This way live credentials will not be exported to code.
+  credentials in settings.php. This way, live credentials will not be stored in the db.
 
 
 HOW IT WORKS
 ------------
 
 * General considerations:
-  - Shop owner must have an Stripe merchant account
-    Sign up
+  - The store owner must have a Stripe merchant account.
+    Sign up here:
     https://dashboard.stripe.com/register
-  - Customer should have a valid credit card.
+  - Customers should have a valid credit card.
+    - Stripe provides several dummy credit card numbers for testing:
+      https://stripe.com/docs/testing
 
 * Checkout workflow:
   It follows the Drupal Commerce Credit Card workflow.
-  The customer should enter its credit card data
-  or to select one of the existing Stripe payment methods.
+  The customer should enter his/her credit card data
+  or select one of the credit cards saved with Stripe
+  from a previous order.
 
 * Payment Terminal
-  The store owners can Void, Capture and Refund the Stripe payments.
+  The store owner can Void, Capture and Refund the Stripe payments.
 
 
 TROUBLESHOOTING
