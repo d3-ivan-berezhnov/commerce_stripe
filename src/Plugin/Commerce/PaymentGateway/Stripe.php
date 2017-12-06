@@ -316,7 +316,7 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
     $owner = $payment_method->getOwner();
     $customer_id = NULL;
     $customer_data = [];
-    if ($owner && !$owner->isAnonymous()) {
+    if ($owner && $owner->isAuthenticated()) {
       $customer_id = $this->getRemoteCustomerId($owner);
       $customer_data['email'] = $owner->getEmail();
     }
@@ -328,7 +328,7 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
       $card = $customer->sources->create(['source' => $payment_details['stripe_token']]);
       return $card;
     }
-    elseif ($owner && !$owner->isAnonymous()) {
+    elseif ($owner && $owner->isAuthenticated()) {
       // Create both the customer and the payment method.
       try {
         $customer = \Stripe\Customer::create([
