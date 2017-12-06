@@ -325,8 +325,13 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
       // If the customer id already exists, use the Stripe form token to create the new card.
       $customer = \Stripe\Customer::retrieve($customer_id);
       // Create a payment method for an existing customer.
-      $card = $customer->sources->create(['source' => $payment_details['stripe_token']]);
-      return $card;
+      try {
+        $card = $customer->sources->create(['source' => $payment_details['stripe_token']]);
+        return $card;
+      }
+      catch (\Stripe\Error\Base $e) {
+        ErrorHelper::handleException($e);
+      }
     }
     elseif ($owner && $owner->isAuthenticated()) {
       // Create both the customer and the payment method.
