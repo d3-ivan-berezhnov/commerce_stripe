@@ -7,7 +7,6 @@ use Drupal\commerce_payment\CreditCard;
 use Drupal\commerce_payment\Entity\PaymentInterface;
 use Drupal\commerce_payment\Entity\PaymentMethodInterface;
 use Drupal\commerce_payment\Exception\HardDeclineException;
-use Drupal\commerce_payment\Exception\InvalidRequestException;
 use Drupal\commerce_payment\PaymentMethodTypeManager;
 use Drupal\commerce_payment\PaymentTypeManager;
 use Drupal\commerce_payment\Plugin\Commerce\PaymentGateway\OnsitePaymentGatewayBase;
@@ -130,11 +129,9 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
     $this->assertPaymentMethod($payment_method);
 
     $amount = $payment->getAmount();
-    $currency_code = $payment->getAmount()->getCurrencyCode();
-
     $transaction_data = [
-      'currency' => $currency_code,
-      'amount' => $this->formatNumber($amount->getNumber()),
+      'currency' => $amount->getCurrencyCode(),
+      'amount' => $this->toMinorUnits($amount),
       'source' => $payment_method->getRemoteId(),
       'capture' => $capture,
     ];
@@ -169,11 +166,10 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
 
     try {
       $remote_id = $payment->getRemoteId();
-      $decimal_amount = $amount->getNumber();
       $charge = \Stripe\Charge::retrieve($remote_id);
-      $charge->amount = $this->formatNumber($decimal_amount);
+      $charge->amount = $this->toMinorUnits($amount);
       $transaction_data = [
-        'amount' => $this->formatNumber($decimal_amount),
+        'amount' => $charge->amount,
       ];
       $charge->capture($transaction_data);
     }
@@ -387,21 +383,6 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
     }
 
     return $map[$card_type];
-  }
-
-  /**
-   * Formats the charge amount for stripe.
-   *
-   * @param integer $amount
-   *   The amount being charged.
-   *
-   * @return integer
-   *   The Stripe formatted amount.
-   */
-  protected function formatNumber($amount) {
-    $amount = $amount * 100;
-    $amount = number_format($amount, 0, '.', '');
-    return $amount;
   }
 
 }
