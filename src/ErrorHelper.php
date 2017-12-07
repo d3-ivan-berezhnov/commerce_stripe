@@ -25,7 +25,16 @@ class ErrorHelper {
   public static function handleException(\Stripe\Error\Base $exception) {
     if ($exception instanceof \Stripe\Error\Card) {
       \Drupal::logger('commerce_stripe')->warning($exception->getMessage());
-      throw new DeclineException('We encountered an error processing your card details. Please verify your details and try again.');
+      if ($exception->getStripeCode() == 'card_declined' && $exception->getDeclineCode() == 'card_not_supported') {
+        // Stripe only supports Visa/MasterCard/Amex for non-USD transactions.
+        // @todo Find a better way to communicate this to the customer.
+        $message = t('Your card is not supported. Please use a Visa, MasterCard, or American Express card.');
+        drupal_set_message($message, 'warning');
+        throw new HardDeclineException($message);
+      }
+      else {
+        throw new DeclineException('We encountered an error processing your card details. Please verify your details and try again.');
+      }
     }
     elseif ($exception instanceof \Stripe\Error\RateLimit) {
       \Drupal::logger('commerce_stripe')->warning($exception->getMessage());
