@@ -191,10 +191,10 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
     // Void Stripe payment - release uncaptured payment.
     try {
       $remote_id = $payment->getRemoteId();
-      $decimal_amount = $payment->getAmount()->getNumber();
+      $amount = $payment->getAmount();
       $data = [
         'charge' => $remote_id,
-        'amount' => $this->formatNumber($decimal_amount),
+        'amount' => $this->toMinorUnits($amount),
       ];
       $release_refund = \Stripe\Refund::create($data);
       ErrorHelper::handleErrors($release_refund);
@@ -218,10 +218,9 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
 
     try {
       $remote_id = $payment->getRemoteId();
-      $decimal_amount = $amount->getNumber();
       $data = [
         'charge' => $remote_id,
-        'amount' => $this->formatNumber($decimal_amount),
+        'amount' => $this->toMinorUnits($amount),
       ];
       $refund = \Stripe\Refund::create($data);
       ErrorHelper::handleErrors($refund);
