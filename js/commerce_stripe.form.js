@@ -55,7 +55,8 @@
         };
         // Create instances of the card elements.
         self.cardNumber = elements.create('cardNumber', {
-          classes: classes
+          classes: classes,
+          placeholder: ''
         });
         self.cardExpiry = elements.create('cardExpiry', {
           classes: classes
