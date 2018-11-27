@@ -14,6 +14,7 @@ use Drupal\commerce_price\Price;
 use Drupal\Component\Datetime\TimeInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Site\Settings;
 
 /**
  * Provides the Stripe payment gateway.
@@ -39,6 +40,14 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
    */
   public function __construct(array $configuration, $plugin_id, $plugin_definition, EntityTypeManagerInterface $entity_type_manager, PaymentTypeManager $payment_type_manager, PaymentMethodTypeManager $payment_method_type_manager, TimeInterface $time) {
     parent::__construct($configuration, $plugin_id, $plugin_definition, $entity_type_manager, $payment_type_manager, $payment_method_type_manager, $time);
+
+    // If Drupal is configured to use a proxy for outgoing requests, make sure
+    // that the proxy CURLOPT_PROXY setting is passed to the Stripe SDK client.
+    $http_client_config = Settings::get('http_client_config');
+    if (!empty($http_client_config['proxy']['https'])) {
+      $curl = new \Stripe\HttpClient\CurlClient([CURLOPT_PROXY => $http_client_config['proxy']['https']]);
+      \Stripe\ApiRequestor::setHttpClient($curl);
+    }
 
     \Stripe\Stripe::setApiKey($this->configuration['secret_key']);
   }
