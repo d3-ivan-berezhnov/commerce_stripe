@@ -112,7 +112,13 @@
 
         // Create a Stripe token and submit the form or display an error.
         var stripeCreateToken = function () {
-          stripe.createToken(self.cardNumber).then(function (result) {
+          var tokenData = {};
+          $form.find('[data-stripe]').each(function (i, v) {
+            var tokenDataName = $(v).data('stripe');
+            tokenData[tokenDataName] = $(v).val();
+          });
+          tokenData['name'] = tokenData['given_name'] + ' ' + tokenData['family_name'];
+          stripe.createToken(self.cardNumber, tokenData).then(function (result) {
             if (result.error) {
               // Inform the user if there was an error.
               stripeErrorDisplay(result.error.message);

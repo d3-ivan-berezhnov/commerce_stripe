@@ -83,13 +83,53 @@ class PaymentMethodAddForm extends BasePaymentMethodAddForm {
    */
   public function buildConfigurationForm(array $form, FormStateInterface $form_state) {
     $form = parent::buildConfigurationForm($form, $form_state);
-    // Add the stripe attribute to the postal code field.
-    $form['billing_information']['address']['widget'][0]['address_line1']['#attributes']['data-stripe'] = 'address_line1';
-    $form['billing_information']['address']['widget'][0]['address_line2']['#attributes']['data-stripe'] = 'address_line2';
-    $form['billing_information']['address']['widget'][0]['locality']['#attributes']['data-stripe'] = 'address_city';
-    $form['billing_information']['address']['widget'][0]['postal_code']['#attributes']['data-stripe'] = 'address_zip';
-    $form['billing_information']['address']['widget'][0]['country_code']['#attributes']['data-stripe'] = 'address_country';
+    $form['billing_information']['#after_build'][] = [get_class($this), 'addAddressAttributes'];
+
     return $form;
+  }
+
+  /**
+   * Element #after_build callback: adds "data-stripe" to address properties.
+   *
+   * This allows our JavaScript to pass these values to Stripe as customer
+   * information, enabling CVC, Zip, and Street checks.
+   *
+   * @param array $element
+   *   The form element.
+   * @param \Drupal\Core\Form\FormStateInterface $form_state
+   *   The current state of the form.
+   *
+   * @return array
+   *   The modified form element.
+   */
+  public static function addAddressAttributes($element, FormStateInterface $form_state) {
+    $element['address']['widget'][0]['address']['given_name']['#attributes']['data-stripe'] = 'given_name';
+    $element['address']['widget'][0]['address']['family_name']['#attributes']['data-stripe'] = 'family_name';
+    $element['address']['widget'][0]['address']['address_line1']['#attributes']['data-stripe'] = 'address_line1';
+    $element['address']['widget'][0]['address']['address_line2']['#attributes']['data-stripe'] = 'address_line2';
+    $element['address']['widget'][0]['address']['locality']['#attributes']['data-stripe'] = 'address_city';
+    $element['address']['widget'][0]['address']['postal_code']['#attributes']['data-stripe'] = 'address_zip';
+    // Country code is a sub-element and needs another callback.
+    $element['address']['widget'][0]['address']['country_code']['#pre_render'][] = [get_called_class(), 'addCountryCodeAttributes'];
+
+    return $element;
+  }
+
+  /**
+   * Element #pre_render callback: adds "data-stripe" to the country_code.
+   *
+   * This ensures data-stripe is on the hidden or select element for the country
+   * code, so that it is properly passed to Stripe.
+   *
+   * @param array $element
+   *   The form element.
+   *
+   * @return array
+   *   The modified form element.
+   */
+  public static function addCountryCodeAttributes($element) {
+    $element['country_code']['#attributes']['data-stripe'] = 'address_country';
+    return $element;
   }
 
 }
