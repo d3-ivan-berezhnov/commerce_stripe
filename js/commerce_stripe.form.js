@@ -45,7 +45,14 @@
 
         // Create a Stripe client.
         /* global Stripe */
-        var stripe = Stripe(drupalSettings.commerceStripe.publishableKey);
+        try {
+          var stripe = Stripe(drupalSettings.commerceStripe.publishableKey);
+        } catch (e) {
+          $form.find('#payment-errors').html(Drupal.theme('commerceStripeError', e.message));
+          $form.find(':input.button--primary').prop('disabled', true);
+          $(this).find('.form-item').hide();
+          return;
+        }
 
         // Create an instance of Stripe Elements.
         var elements = stripe.elements();
@@ -107,7 +114,7 @@
           $form.find('#payment-errors').html(Drupal.theme('commerceStripeError', error_message));
 
           // Allow the customer to re-submit the form.
-          $form.find('button').prop('disabled', false);
+          $form.find(':input.button--primary').prop('disabled', false);
         };
 
         // Create a Stripe token and submit the form or display an error.
@@ -133,7 +140,7 @@
         // Form submit.
         $form.on('submit.commerce_stripe', function (e) {
           // Disable the submit button to prevent repeated clicks.
-          $form.find('button').prop('disabled', true);
+          $form.find(':input.button--primary').prop('disabled', true);
 
           // Try to create the Stripe token and submit the form.
           stripeCreateToken();
