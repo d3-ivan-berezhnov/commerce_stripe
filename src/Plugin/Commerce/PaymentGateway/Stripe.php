@@ -11,10 +11,14 @@ use Drupal\commerce_payment\PaymentMethodTypeManager;
 use Drupal\commerce_payment\PaymentTypeManager;
 use Drupal\commerce_payment\Plugin\Commerce\PaymentGateway\OnsitePaymentGatewayBase;
 use Drupal\commerce_price\Price;
+use Drupal\commerce_stripe\Event\TransactionDataEvent;
+use Drupal\commerce_stripe\Event\StripeEvents;
 use Drupal\Component\Datetime\TimeInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Site\Settings;
+use Symfony\Component\DependencyInjection\ContainerInterface;
+use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 
 /**
  * Provides the Stripe payment gateway.
@@ -36,10 +40,34 @@ use Drupal\Core\Site\Settings;
 class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
 
   /**
+   * The event dispatcher.
+   *
+   * @var \Symfony\Component\EventDispatcher\EventDispatcherInterface
+   */
+  protected $eventDispatcher;
+
+  /**
    * {@inheritdoc}
    */
-  public function __construct(array $configuration, $plugin_id, $plugin_definition, EntityTypeManagerInterface $entity_type_manager, PaymentTypeManager $payment_type_manager, PaymentMethodTypeManager $payment_method_type_manager, TimeInterface $time) {
+  public static function create(ContainerInterface $container, array $configuration, $plugin_id, $plugin_definition) {
+    return new static(
+      $configuration,
+      $plugin_id,
+      $plugin_definition,
+      $container->get('entity_type.manager'),
+      $container->get('plugin.manager.commerce_payment_type'),
+      $container->get('plugin.manager.commerce_payment_method_type'),
+      $container->get('datetime.time'),
+      $container->get('event_dispatcher')
+    );
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function __construct(array $configuration, $plugin_id, $plugin_definition, EntityTypeManagerInterface $entity_type_manager, PaymentTypeManager $payment_type_manager, PaymentMethodTypeManager $payment_method_type_manager, TimeInterface $time, EventDispatcherInterface $event_dispatcher) {
     parent::__construct($configuration, $plugin_id, $plugin_definition, $entity_type_manager, $payment_type_manager, $payment_method_type_manager, $time);
+    $this->eventDispatcher = $event_dispatcher;
 
     // If Drupal is configured to use a proxy for outgoing requests, make sure
     // that the proxy CURLOPT_PROXY setting is passed to the Stripe SDK client.
@@ -143,7 +171,20 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
       'amount' => $this->toMinorUnits($amount),
       'source' => $payment_method->getRemoteId(),
       'capture' => $capture,
+      'metadata' => [
+        'order_id' => $payment->getOrderId(),
+        'store_id' => $payment->getOrder()->getStoreId(),
+      ],
     ];
+
+    // Add metadata and extra transaction data where required.
+    $event = new TransactionDataEvent($payment);
+    $this->eventDispatcher->dispatch(StripeEvents::TRANSACTION_DATA, $event);
+
+    // Update the transaction data from additional information added through
+    // the event.
+    $transaction_data += $event->getTransactionData();
+    $transaction_data['metadata'] += $event->getMetadata();
 
     $owner = $payment_method->getOwner();
     if ($owner && $owner->isAuthenticated()) {
@@ -258,7 +299,7 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
     $required_keys = [
       // The expected keys are payment gateway specific and usually match
       // the PaymentMethodAddForm form elements. They are expected to be valid.
-      'stripe_token'
+      'stripe_token',
     ];
     foreach ($required_keys as $required_key) {
       if (empty($payment_details[$required_key])) {
@@ -297,7 +338,6 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
     // Delete the local entity.
     $payment_method->delete();
   }
-
 
   /**
    * Creates the payment method on the gateway.
