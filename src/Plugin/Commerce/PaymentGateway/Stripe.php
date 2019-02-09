@@ -67,8 +67,22 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
    */
   public function __construct(array $configuration, $plugin_id, $plugin_definition, EntityTypeManagerInterface $entity_type_manager, PaymentTypeManager $payment_type_manager, PaymentMethodTypeManager $payment_method_type_manager, TimeInterface $time, EventDispatcherInterface $event_dispatcher) {
     parent::__construct($configuration, $plugin_id, $plugin_definition, $entity_type_manager, $payment_type_manager, $payment_method_type_manager, $time);
-    $this->eventDispatcher = $event_dispatcher;
 
+    $this->eventDispatcher = $event_dispatcher;
+    $this->init();
+  }
+
+  /**
+   * Re-initializes the SDK after the plugin is unserialized.
+   */
+  public function __wakeup() {
+    $this->init();
+  }
+
+  /**
+   * Initializes the SDK.
+   */
+  protected function init() {
     // If Drupal is configured to use a proxy for outgoing requests, make sure
     // that the proxy CURLOPT_PROXY setting is passed to the Stripe SDK client.
     $http_client_config = Settings::get('http_client_config');
