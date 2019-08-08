@@ -413,8 +413,6 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
     }
     else {
       $card_token = \Stripe\Token::retrieve($payment_details['stripe_token']);
-      // We need to use token for Anonymous customers.
-      $card_token->card['id'] = $payment_details['stripe_token'];
       return $card_token->card;
     }
 
