@@ -100,21 +100,16 @@
         var stripeErrorHandler = function (result) {
           if (result.error) {
             // Inform the user if there was an error.
-            stripeErrorDisplay(result.error.message);
+            // Display the message error in the payment form.
+            Drupal.commerceStripe.displayError(result.error.message);
+
+            // Allow the customer to re-submit the form.
+            $form.find(':input.button--primary').prop('disabled', false);
           }
           else {
             // Clean up error messages.
             $form.find('#payment-errors').html('');
           }
-        };
-
-        // Helper for displaying the error messages within the form.
-        var stripeErrorDisplay = function (error_message) {
-          // Display the message error in the payment form.
-          $form.find('#payment-errors').html(Drupal.theme('commerceStripeError', error_message));
-
-          // Allow the customer to re-submit the form.
-          $form.find(':input.button--primary').prop('disabled', false);
         };
 
         // Create a Stripe token and submit the form or display an error.
@@ -128,7 +123,7 @@
           stripe.createToken(self.cardNumber, tokenData).then(function (result) {
             if (result.error) {
               // Inform the user if there was an error.
-              stripeErrorDisplay(result.error.message);
+              stripeErrorHandler(result);
             }
             else {
               // Send the token to your server.
@@ -171,11 +166,5 @@
       $form.off('submit.commerce_stripe');
     }
   };
-
-  $.extend(Drupal.theme, /** @lends Drupal.theme */{
-    commerceStripeError: function (message) {
-      return $('<div class="messages messages--error"></div>').html(message);
-    }
-  });
 
 })(jQuery, Drupal, drupalSettings);
