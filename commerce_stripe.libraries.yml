@@ -29,3 +29,14 @@ form:
     - core/jquery.once
     - commerce_stripe/messages
     - commerce_stripe/stripe
+
+checkout_review:
+  version: VERSION
+  js:
+    js/commerce_stripe.review.js: {}
+  dependencies:
+    - core/jquery
+    - core/drupal
+    - core/jquery.once
+    - commerce_stripe/messages
+    - commerce_stripe/stripe

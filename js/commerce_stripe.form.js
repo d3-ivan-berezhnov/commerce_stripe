@@ -38,11 +38,6 @@
       $('.stripe-form', context).once('stripe-processed').each(function () {
         var $form = $(this).closest('form');
 
-        // Clear the token every time the payment form is loaded. We only need the token
-        // one time, as it is submitted to Stripe after a card is validated. If this
-        // form reloads it's due to an error; received tokens are stored in the checkout pane.
-        $('#stripe_token', $form).val('');
-
         // Create a Stripe client.
         /* global Stripe */
         try {
@@ -87,15 +82,6 @@
           stripeErrorHandler(event);
         });
 
-        // Insert the token ID into the form so it gets submitted to the server
-        var stripeTokenHandler = function (token) {
-          // Set the Stripe token value.
-          $('#stripe_token', $form).val(token.id);
-
-          // Submit the form.
-          $form.get(0).submit();
-        };
-
         // Helper to handle the Stripe responses with errors.
         var stripeErrorHandler = function (result) {
           if (result.error) {
@@ -112,33 +98,40 @@
           }
         };
 
-        // Create a Stripe token and submit the form or display an error.
-        var stripeCreateToken = function () {
-          var tokenData = {};
-          $form.find('[data-stripe]').each(function (i, v) {
-            var tokenDataName = $(v).data('stripe');
-            tokenData[tokenDataName] = $(v).val();
-          });
-          tokenData['name'] = tokenData['given_name'] + ' ' + tokenData['family_name'];
-          stripe.createToken(self.cardNumber, tokenData).then(function (result) {
-            if (result.error) {
-              // Inform the user if there was an error.
-              stripeErrorHandler(result);
-            }
-            else {
-              // Send the token to your server.
-              stripeTokenHandler(result.token);
-            }
-          });
-        };
-
         // Form submit.
         $form.on('submit.commerce_stripe', function (e) {
-          // Disable the submit button to prevent repeated clicks.
-          $form.find(':input.button--primary').prop('disabled', true);
+          if ($('#stripe-payment-method-id', $form).val().length > 0) {
+            return true;
+          }
 
-          // Try to create the Stripe token and submit the form.
-          stripeCreateToken();
+          if (drupalSettings.commerceStripe.clientSecret === null) {
+            // Try to create the Stripe token and submit the form.
+            stripe.createPaymentMethod('card', self.cardNumber).then(function (result) {
+              if (result.error) {
+                // Inform the user if there was an error.
+                stripeErrorHandler(result);
+              } else {
+                $('#stripe-payment-method-id', $form).val(result.paymentMethod.id);
+                $form.find(':input.button--primary').click();
+              }
+            });
+          } else {
+            stripe.handleCardSetup(drupalSettings.commerceStripe.clientSecret, self.cardNumber).then(function (result) {
+            debugger;
+              if (result.error) {
+                // Inform the user if there was an error.
+                stripeErrorHandler(result);
+              }
+              else {
+                // Insert the payment method ID into the form so it gets submitted to
+                // the server.
+                // Set the Stripe token value.
+                $('#stripe-payment-method-id', $form).val(result.setupIntent.payment_method);
+                // Submit the form.
+                $form.find(':input.button--primary').click();
+              }
+            });
+          }
 
           // Prevent the form from submitting with the default action.
           if ($('#card-number-element', $form).length) {

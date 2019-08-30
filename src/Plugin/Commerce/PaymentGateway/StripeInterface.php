@@ -2,6 +2,7 @@
 
 namespace Drupal\commerce_stripe\Plugin\Commerce\PaymentGateway;
 
+use Drupal\commerce_order\Entity\OrderInterface;
 use Drupal\commerce_payment\Plugin\Commerce\PaymentGateway\OnsitePaymentGatewayInterface;
 use Drupal\commerce_payment\Plugin\Commerce\PaymentGateway\SupportsAuthorizationsInterface;
 use Drupal\commerce_payment\Plugin\Commerce\PaymentGateway\SupportsRefundsInterface;
@@ -18,5 +19,18 @@ interface StripeInterface extends OnsitePaymentGatewayInterface, SupportsAuthori
    *   The Stripe API publishable key.
    */
   public function getPublishableKey();
+
+  /**
+   * Create a payment intent for an order.
+   *
+   * @param \Drupal\commerce_order\Entity\OrderInterface $order
+   *   The order.
+   * @param bool $capture
+   *   Whether the created payment intent capture is automatic or manual.
+   *
+   * @return \Stripe\PaymentIntent
+   *   The payment intent.
+   */
+  public function createPaymentIntent(OrderInterface $order, $capture = TRUE);
 
 }

@@ -13,6 +13,8 @@ use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 /**
  * Tests the Stripe app information.
  *
+ * @note This cannot be a Unit test due to dependency on system_get_info().
+ *
  * @group commerce_stripe
  */
 class AppInfoTest extends KernelTestBase {
@@ -24,7 +26,7 @@ class AppInfoTest extends KernelTestBase {
    */
   public function testStripeAppInfo() {
     $secret_key = $this->randomMachineName();
-    $plugin = new Stripe(
+    new Stripe(
       ['secret_key' => $secret_key],
       'stripe',
       [
