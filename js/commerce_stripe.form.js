@@ -117,7 +117,6 @@
             });
           } else {
             stripe.handleCardSetup(drupalSettings.commerceStripe.clientSecret, self.cardNumber).then(function (result) {
-            debugger;
               if (result.error) {
                 // Inform the user if there was an error.
                 stripeErrorHandler(result);
