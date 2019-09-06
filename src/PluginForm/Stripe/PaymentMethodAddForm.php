@@ -114,7 +114,9 @@ class PaymentMethodAddForm extends BasePaymentMethodAddForm {
    */
   public function buildConfigurationForm(array $form, FormStateInterface $form_state) {
     $form = parent::buildConfigurationForm($form, $form_state);
-    $form['billing_information']['#after_build'][] = [get_class($this), 'addAddressAttributes'];
+    if (isset($form['billing_information'])) {
+      $form['billing_information']['#after_build'][] = [get_class($this), 'addAddressAttributes'];
+    }
 
     return $form;
   }

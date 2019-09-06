@@ -125,6 +125,46 @@ class CheckoutTest extends CommerceWebDriverTestBase {
   }
 
   /**
+   * Tests checkout without billing information.
+   *
+   * This uses a card which does not trigger SCA or 3DS authentication.
+   *
+   * @dataProvider dataProviderUserAuthenticated
+   */
+  public function testNoBillingCheckout($authenticated) {
+    $payment_gateway = PaymentGateway::load('stripe_testing');
+    $configuration = $payment_gateway->getPlugin()->getConfiguration();
+    $configuration['collect_billing_information'] = FALSE;
+    $payment_gateway->getPlugin()->setConfiguration($configuration);
+    $payment_gateway->save();
+
+    if ($authenticated) {
+      $customer = $this->createUser();
+      $this->drupalLogin($customer);
+    }
+    $this->drupalGet($this->product->toUrl()->toString());
+    $this->submitForm([], 'Add to cart');
+    $cart_link = $this->getSession()->getPage()->findLink('your cart');
+    $cart_link->click();
+    $this->submitForm([], 'Checkout');
+
+    if (!$authenticated) {
+      $this->submitForm([], 'Continue as Guest');
+      $this->getSession()->getPage()->fillField('contact_information[email]', 'guest@example.com');
+      $this->getSession()->getPage()->fillField('contact_information[email_confirm]', 'guest@example.com');
+    }
+
+    $this->fillCreditCardData('4242424242424242', '0322', '123');
+    $this->submitForm([], 'Continue to review');
+
+    $this->assertWaitForText('Visa ending in 4242');
+    $this->assertWaitForText('Expires 3/2022');
+    $this->submitForm([], 'Pay and complete purchase');
+
+    $this->assertWaitForText('Your order number is 1. You can view your order on your account page when logged in.');
+  }
+
+  /**
    * Tests customer, with regulations, can checkout.
    *
    * This card requires authentication for one-time payments. However, if you

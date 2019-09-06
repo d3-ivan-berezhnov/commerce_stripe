@@ -40,6 +40,7 @@ use Symfony\Component\EventDispatcher\EventDispatcherInterface;
  *     "amex", "dinersclub", "discover", "jcb", "maestro", "mastercard", "visa",
  *   },
  *   js_library = "commerce_stripe/form",
+ *   requires_billing_information = FALSE,
  * )
  */
 class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
@@ -484,21 +485,22 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
       }
 
       if ($customer_id && $email) {
-        $billing_address = $payment_method->getBillingProfile()->get('address')->first()->toArray();
-        \Stripe\PaymentMethod::update($stripe_payment_method_id, [
-          'billing_details' => [
-            'address' => [
-              'city' => $billing_address['locality'],
-              'country' => $billing_address['country_code'],
-              'line1' => $billing_address['address_line1'],
-              'line2' => $billing_address['address_line2'],
-              'postal_code' => $billing_address['postal_code'],
-              'state' => $billing_address['administrative_area'],
-            ],
-            'email' => $email,
-            'name' => $billing_address['given_name'] . ' ' . $billing_address['family_name'],
-          ],
-        ]);
+        $payment_method_data = [
+          'email' => $email,
+        ];
+        if ($billing_profile = $payment_method->getBillingProfile()) {
+          $billing_address = $billing_profile->get('address')->first()->toArray();
+          $payment_method_data['address'] = [
+            'city' => $billing_address['locality'],
+            'country' => $billing_address['country_code'],
+            'line1' => $billing_address['address_line1'],
+            'line2' => $billing_address['address_line2'],
+            'postal_code' => $billing_address['postal_code'],
+            'state' => $billing_address['administrative_area'],
+          ];
+          $payment_method_data['name'] = $billing_address['given_name'] . ' ' . $billing_address['family_name'];
+        }
+        \Stripe\PaymentMethod::update($stripe_payment_method_id, ['billing_details' => $payment_method_data]);
       }
     }
     catch (\Stripe\Error\Base $e) {
