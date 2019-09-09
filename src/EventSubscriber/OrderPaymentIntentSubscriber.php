@@ -88,7 +88,11 @@ class OrderPaymentIntentSubscriber implements EventSubscriberInterface, Destruct
       return;
     }
     $intent_id = $order->getData('stripe_intent');
-    if ($intent_id !== NULL) {
+    if ($intent_id === NULL) {
+      return;
+    }
+    $total_price = $order->getTotalPrice();
+    if ($total_price !== NULL) {
       $amount = $this->toMinorUnits($order->getTotalPrice());
       $this->updateList[$intent_id] = $amount;
     }

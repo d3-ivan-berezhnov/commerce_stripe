@@ -143,6 +143,75 @@ class PaymentIntentTest extends StripeIntegrationTestBase {
   }
 
   /**
+   * Tests the intent sync does not fail if order was emptied.
+   */
+  public function testIntentEmptyOrderSync() {
+    $gateway = $this->generateGateway();
+    $plugin = $gateway->getPlugin();
+    assert($plugin instanceof StripeInterface);
+
+    $order = Order::create([
+      'type' => 'default',
+      'store_id' => $this->store->id(),
+      'uid' => 0,
+      'state' => 'draft',
+    ]);
+    $order_item = OrderItem::create([
+      'type' => 'test',
+      'quantity' => 1,
+      'unit_price' => new Price('10.50', 'USD'),
+    ]);
+    $order_item->save();
+    $order->addItem($order_item);
+    $payment_method = PaymentMethod::create([
+      'type' => 'credit_card',
+      'payment_gateway' => $gateway->id(),
+      'payment_gateway_mode' => 'test',
+      'remote_id' => 'pm_card_threeDSecure2Required|',
+    ]);
+    $payment_method->save();
+    $order->set('payment_method', $payment_method);
+    $order->set('payment_gateway', $gateway);
+    $order->save();
+
+    $intent = $plugin->createPaymentIntent($order);
+
+    $this->assertEquals(1050, $intent->amount);
+
+    $order->addAdjustment(new Adjustment([
+      'type' => 'custom',
+      'label' => 'Back to school discount',
+      'amount' => new Price('-5.00', 'USD'),
+    ]));
+    $order->save();
+    // Flush pending updates.
+    $this->container->get('commerce_stripe.order_events_subscriber')->destruct();
+
+    $this->assertEquals('5.50', $order->getTotalPrice()->getNumber());
+    $intent = PaymentIntent::retrieve($intent->id);
+    $this->assertEquals(550, $intent->amount);
+
+    $order->setAdjustments([]);
+    $order->removeItem($order_item);
+    $order->save();
+    // Flush pending updates.
+    $this->container->get('commerce_stripe.order_events_subscriber')->destruct();
+
+    $this->assertNull($order->getTotalPrice());
+    $intent = PaymentIntent::retrieve($intent->id);
+    $this->assertEquals(550, $intent->amount, 'Intent has the same previous value');
+
+    $order->addItem($order_item);
+    $order->save();
+    // Flush pending updates.
+    $this->container->get('commerce_stripe.order_events_subscriber')->destruct();
+
+    $this->assertEquals('10.50', $order->getTotalPrice()->getNumber());
+    $intent = PaymentIntent::retrieve($intent->id);
+    $this->assertEquals(1050, $intent->amount);
+  }
+
+  /**
    * Data provider for createPaymentIntent.
    *
    * @return \Generator
