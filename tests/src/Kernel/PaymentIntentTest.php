@@ -82,8 +82,13 @@ class PaymentIntentTest extends StripeIntegrationTestBase {
 
   /**
    * Tests that the order total syncs the payment intent total.
+   *
+   * @param bool $deleted_gateway
+   *   Boolean to determine if the test should delete the gateway.
+   *
+   * @dataProvider dataProviderOrderSync
    */
-  public function testIntentOrderTotalSync() {
+  public function testIntentOrderTotalSync($deleted_gateway) {
     $gateway = $this->generateGateway();
     $plugin = $gateway->getPlugin();
     assert($plugin instanceof StripeInterface);
@@ -116,6 +121,11 @@ class PaymentIntentTest extends StripeIntegrationTestBase {
 
     $this->assertEquals(1050, $intent->amount);
 
+    if ($deleted_gateway) {
+      $gateway->delete();
+    }
+
+    $order = $this->reloadEntity($order);
     $order->addAdjustment(new Adjustment([
       'type' => 'custom',
       'label' => 'Back to school discount',
@@ -127,7 +137,9 @@ class PaymentIntentTest extends StripeIntegrationTestBase {
 
     $this->assertEquals('5.50', $order->getTotalPrice()->getNumber());
     $intent = PaymentIntent::retrieve($intent->id);
-    $this->assertEquals(550, $intent->amount);
+    // If the payment gateway was deleted, the payment intent could not
+    // be updated.
+    $this->assertEquals($deleted_gateway ? 1050 : 550, $intent->amount);
   }
 
   /**
@@ -146,6 +158,17 @@ class PaymentIntentTest extends StripeIntegrationTestBase {
     yield ['pm_card_visa', TRUE, PaymentIntent::STATUS_REQUIRES_CONFIRMATION, PaymentIntent::STATUS_SUCCEEDED];
     // 3DS is not supported on this card and cannot be invoked.
     yield ['pm_card_amex_threeDSecureNotSupported', TRUE, PaymentIntent::STATUS_REQUIRES_CONFIRMATION, PaymentIntent::STATUS_SUCCEEDED];
+  }
+
+  /**
+   * Data provider for testing payment intent updates.
+   *
+   * @return \Generator
+   *   The test data.
+   */
+  public function dataProviderOrderSync() {
+    yield [FALSE];
+    yield [TRUE];
   }
 
 }

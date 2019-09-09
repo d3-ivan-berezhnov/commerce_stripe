@@ -4,6 +4,7 @@ namespace Drupal\commerce_stripe\EventSubscriber;
 
 use Drupal\commerce_order\Event\OrderEvent;
 use Drupal\commerce_order\Event\OrderEvents;
+use Drupal\commerce_payment\Entity\PaymentGatewayInterface;
 use Drupal\commerce_price\Calculator;
 use Drupal\commerce_price\Price;
 use Drupal\commerce_stripe\Plugin\Commerce\PaymentGateway\StripeInterface;
@@ -79,7 +80,7 @@ class OrderPaymentIntentSubscriber implements EventSubscriberInterface, Destruct
   public function onOrderUpdate(OrderEvent $event) {
     $order = $event->getOrder();
     $gateway = $order->get('payment_gateway');
-    if ($gateway->isEmpty()) {
+    if ($gateway->isEmpty() || !$gateway->entity instanceof PaymentGatewayInterface) {
       return;
     }
     $plugin = $gateway->entity->getPlugin();
