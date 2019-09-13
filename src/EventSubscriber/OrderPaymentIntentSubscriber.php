@@ -63,7 +63,15 @@ class OrderPaymentIntentSubscriber implements EventSubscriberInterface, Destruct
   public function destruct() {
     foreach ($this->updateList as $intent_id => $amount) {
       try {
-        PaymentIntent::update($intent_id, ['amount' => $amount]);
+        $intent = PaymentIntent::retrieve($intent_id);
+        // You may only update the amount of a PaymentIntent with one of the
+        // following statuses: requires_payment_method, requires_confirmation.
+        if (in_array($intent->status, [
+          PaymentIntent::STATUS_REQUIRES_PAYMENT_METHOD,
+          PaymentIntent::STATUS_REQUIRES_CONFIRMATION,
+        ], TRUE)) {
+          PaymentIntent::update($intent_id, ['amount' => $amount]);
+        }
       }
       catch (StripeError $e) {
         // Allow sync errors to silently fail.

@@ -77,6 +77,7 @@ class CreatePaymentTest extends StripeIntegrationTestBase {
     $order->set('payment_method', $payment_method);
     $order->set('payment_gateway', $gateway);
     $order->save();
+    $this->container->get('commerce_stripe.order_events_subscriber')->destruct();
 
     $payment = Payment::create([
       'state' => 'new',
@@ -103,6 +104,10 @@ class CreatePaymentTest extends StripeIntegrationTestBase {
     // Tests metadata set by commerce_stripe_test.
     $this->assertEquals($intent->metadata['payment_uuid'], $payment->uuid());
 
+    $order = $this->reloadEntity($order);
+    $this->assertNull($order->getData('stripe_intent'));
+    $order->getState()->applyTransitionById('place');
+    $order->save();
   }
 
   /**

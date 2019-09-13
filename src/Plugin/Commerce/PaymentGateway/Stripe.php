@@ -236,6 +236,9 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
       \Stripe\PaymentIntent::update($intent->id, [
         'metadata' => $metadata,
       ]);
+
+      $order->unsetData('stripe_intent');
+      $order->save();
     }
     catch (\Stripe\Error\Base $e) {
       ErrorHelper::handleException($e);
