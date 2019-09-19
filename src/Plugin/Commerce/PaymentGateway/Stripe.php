@@ -91,7 +91,7 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
   protected function init() {
     $info = system_get_info('module', 'commerce_stripe')['version'];
     $version = !empty($info['version']) ? $info['version'] : '8.x-1.0-dev';
-    \Stripe\Stripe::setAppInfo('Centarro Commerce for Drupal', $version, 'https://www.drupal.org/project/commerce_stripe');
+    \Stripe\Stripe::setAppInfo('Centarro Commerce for Drupal', $version, 'https://www.drupal.org/project/commerce_stripe', 'pp_partner_Fa3jTqCJqTDtHD');
 
     // If Drupal is configured to use a proxy for outgoing requests, make sure
     // that the proxy CURLOPT_PROXY setting is passed to the Stripe SDK client.
@@ -102,6 +102,7 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
     }
 
     \Stripe\Stripe::setApiKey($this->configuration['secret_key']);
+    \Stripe\Stripe::setApiVersion('2019-09-09');
   }
 
   /**

@@ -46,7 +46,7 @@ class AppInfoTest extends KernelTestBase {
     $app_info = \Stripe\Stripe::getAppInfo();
     $this->assertEquals([
       'name' => 'Centarro Commerce for Drupal',
-      'partner_id' => NULL,
+      'partner_id' => 'pp_partner_Fa3jTqCJqTDtHD',
       'url' => 'https://www.drupal.org/project/commerce_stripe',
       'version' => '8.x-1.0-dev',
     ], $app_info);
