@@ -136,14 +136,16 @@ class PaymentMethodAddForm extends BasePaymentMethodAddForm {
    *   The modified form element.
    */
   public static function addAddressAttributes(array $element, FormStateInterface $form_state) {
-    $element['address']['widget'][0]['address']['given_name']['#attributes']['data-stripe'] = 'given_name';
-    $element['address']['widget'][0]['address']['family_name']['#attributes']['data-stripe'] = 'family_name';
-    $element['address']['widget'][0]['address']['address_line1']['#attributes']['data-stripe'] = 'address_line1';
-    $element['address']['widget'][0]['address']['address_line2']['#attributes']['data-stripe'] = 'address_line2';
-    $element['address']['widget'][0]['address']['locality']['#attributes']['data-stripe'] = 'address_city';
-    $element['address']['widget'][0]['address']['postal_code']['#attributes']['data-stripe'] = 'address_zip';
-    // Country code is a sub-element and needs another callback.
-    $element['address']['widget'][0]['address']['country_code']['#pre_render'][] = [get_called_class(), 'addCountryCodeAttributes'];
+    if (isset($element['address'])) {
+      $element['address']['widget'][0]['address']['given_name']['#attributes']['data-stripe'] = 'given_name';
+      $element['address']['widget'][0]['address']['family_name']['#attributes']['data-stripe'] = 'family_name';
+      $element['address']['widget'][0]['address']['address_line1']['#attributes']['data-stripe'] = 'address_line1';
+      $element['address']['widget'][0]['address']['address_line2']['#attributes']['data-stripe'] = 'address_line2';
+      $element['address']['widget'][0]['address']['locality']['#attributes']['data-stripe'] = 'address_city';
+      $element['address']['widget'][0]['address']['postal_code']['#attributes']['data-stripe'] = 'address_zip';
+      // Country code is a sub-element and needs another callback.
+      $element['address']['widget'][0]['address']['country_code']['#pre_render'][] = [get_called_class(), 'addCountryCodeAttributes'];
+    }
 
     return $element;
   }
