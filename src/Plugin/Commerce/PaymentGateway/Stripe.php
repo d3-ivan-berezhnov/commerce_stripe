@@ -82,6 +82,8 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
    * Re-initializes the SDK after the plugin is unserialized.
    */
   public function __wakeup() {
+    parent::__wakeup();
+
     $this->init();
   }
 
