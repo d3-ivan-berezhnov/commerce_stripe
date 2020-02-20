@@ -31,6 +31,7 @@ class CheckoutTest extends CommerceWebDriverTestBase {
    * {@inheritdoc}
    */
   public static $modules = [
+    'commerce_number_pattern',
     'commerce_product',
     'commerce_cart',
     'commerce_checkout',
@@ -42,6 +43,7 @@ class CheckoutTest extends CommerceWebDriverTestBase {
    */
   protected function setUp() {
     parent::setUp();
+
     $variation = $this->createEntity('commerce_product_variation', [
       'type' => 'default',
       'sku' => strtolower($this->randomMachineName()),

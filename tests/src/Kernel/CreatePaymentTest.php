@@ -15,26 +15,9 @@ use Stripe\PaymentIntent;
 /**
  * Tests creating a payment.
  *
- * @group commerce_strip
+ * @group commerce_stripe
  */
 class CreatePaymentTest extends StripeIntegrationTestBase {
-
-  /**
-   * {@inheritdoc}
-   */
-  protected function setUp() {
-    parent::setUp();
-    $this->installEntitySchema('commerce_order');
-    $this->installEntitySchema('commerce_order_item');
-    $this->installEntitySchema('commerce_payment_method');
-    $this->installEntitySchema('commerce_payment');
-    $this->installConfig(['commerce_order']);
-    OrderItemType::create([
-      'id' => 'test',
-      'label' => 'Test',
-      'orderType' => 'default',
-    ])->save();
-  }
 
   /**
    * Tests createPayment.

@@ -19,7 +19,13 @@ use Symfony\Component\EventDispatcher\EventDispatcherInterface;
  */
 class AppInfoTest extends KernelTestBase {
 
-  protected static $modules = ['system', 'commerce_stripe'];
+  /**
+   * {@inheritdoc}
+   */
+  protected static $modules = [
+    'system',
+    'commerce_stripe',
+  ];
 
   /**
    * Tests Stripe app info set during plugin initialization.

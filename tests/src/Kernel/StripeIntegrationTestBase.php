@@ -3,19 +3,14 @@
 namespace Drupal\Tests\commerce_stripe\Kernel;
 
 use Drupal\commerce_payment\Entity\PaymentGateway;
-use Drupal\Tests\commerce\Kernel\CommerceKernelTestBase;
+use Drupal\Tests\commerce_order\Kernel\OrderKernelTestBase;
 
-abstract class StripeIntegrationTestBase extends CommerceKernelTestBase {
+abstract class StripeIntegrationTestBase extends OrderKernelTestBase {
 
   /**
    * {@inheritdoc}
    */
   public static $modules = [
-    'state_machine',
-    'address',
-    'profile',
-    'entity_reference_revisions',
-    'commerce_order',
     'commerce_payment',
     'commerce_stripe',
     'commerce_stripe_test',
@@ -30,6 +25,16 @@ abstract class StripeIntegrationTestBase extends CommerceKernelTestBase {
    * The development secret key.
    */
   const TEST_SECRET_KEY = 'sk_test_4g69Cl9vOTJxe7bUmy5TRgWE00ytQmCnep';
+
+  /**
+   * {@inheritdoc}
+   */
+  protected function setUp() {
+    parent::setUp();
+
+    $this->installEntitySchema('commerce_payment_method');
+    $this->installEntitySchema('commerce_payment');
+  }
 
   /**
    * Generate a payment gateway for testing.
