@@ -57,6 +57,7 @@ class StripeReview extends CheckoutPaneBase {
    */
   public function buildConfigurationForm(array $form, FormStateInterface $form_state) {
     $form = parent::buildConfigurationForm($form, $form_state);
+
     $form['button_id'] = [
       '#type' => 'textfield',
       '#title' => $this->t('Button HTML ID'),
@@ -84,7 +85,7 @@ class StripeReview extends CheckoutPaneBase {
    */
   public function isVisible() {
     $gateway = $this->order->get('payment_gateway');
-    if ($gateway->isEmpty()) {
+    if ($gateway->isEmpty() || empty($gateway->entity)) {
       return FALSE;
     }
     return $gateway->entity->getPlugin() instanceof StripeInterface;
