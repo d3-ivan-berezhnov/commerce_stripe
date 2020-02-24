@@ -29,7 +29,7 @@ class ErrorHelper {
         // Stripe only supports Visa/MasterCard/Amex for non-USD transactions.
         // @todo Find a better way to communicate this to the customer.
         $message = t('Your card is not supported. Please use a Visa, MasterCard, or American Express card.');
-        drupal_set_message($message, 'warning');
+        \Drupal::messenger()->addWarning($message);
         throw new HardDeclineException($message);
       }
       else {

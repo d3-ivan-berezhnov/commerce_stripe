@@ -18,24 +18,18 @@ class TransactionDataSubscriber implements EventSubscriberInterface {
   }
 
   /**
-   * Example of adding additional data to a transaction.
+   * Adds additional metadata to a transaction.
    *
    * @param \Drupal\commerce_stripe\Event\TransactionDataEvent $event
    *   The transaction data event.
    */
   public function addTransactionData(TransactionDataEvent $event) {
     $payment = $event->getPayment();
-    $data = $event->getTransactionData();
     $metadata = $event->getMetadata();
-
-    $data['description'] = sprintf('Order #%s', $payment->getOrderId());
-
     // Add the payment's UUID to the Stripe transaction metadata. For example,
     // another service may query Stripe payment transactions and also load the
     // payment from Drupal Commerce over JSON API.
     $metadata['payment_uuid'] = $payment->uuid();
-
-    $event->setTransactionData($data);
     $event->setMetadata($metadata);
   }
 
