@@ -104,7 +104,7 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
     }
 
     \Stripe\Stripe::setApiKey($this->configuration['secret_key']);
-    \Stripe\Stripe::setApiVersion('2019-09-09');
+    \Stripe\Stripe::setApiVersion('2019-12-03');
   }
 
   /**
