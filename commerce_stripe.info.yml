@@ -2,6 +2,6 @@ name: Commerce Stripe
 type: module
 description: 'Provides Commerce integration for Stripe Payments.'
 package: Commerce (contrib)
-core: 8.x
+core_version_requirement: ^8.7.7 || ^9
 dependencies:
   - commerce:commerce_payment
