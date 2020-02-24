@@ -1,8 +1,8 @@
 {
     "require": {
         "stripe/stripe-php": {
-            "version" : "v6.38.0",
-            "url": "https://github.com/stripe/stripe-php/archive/v6.38.0.zip"
+            "version" : "v7.25.0",
+            "url": "https://github.com/stripe/stripe-php/archive/v7.25.0.zip"
         }
     }
 }

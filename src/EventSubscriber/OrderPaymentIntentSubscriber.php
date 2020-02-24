@@ -10,7 +10,7 @@ use Drupal\commerce_price\Price;
 use Drupal\commerce_stripe\Plugin\Commerce\PaymentGateway\StripeInterface;
 use Drupal\Core\DestructableInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
-use Stripe\Error\Base as StripeError;
+use Stripe\Exception\ApiErrorException as StripeError;
 use Stripe\PaymentIntent;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 

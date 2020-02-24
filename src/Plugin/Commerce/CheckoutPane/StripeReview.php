@@ -110,7 +110,7 @@ class StripeReview extends CheckoutPaneBase {
       try {
         $intent = \Stripe\PaymentIntent::retrieve($intent_id);
       }
-      catch (\Stripe\Error\Base $e) {
+      catch (\Stripe\Exception\ApiErrorException $e) {
         ErrorHelper::handleException($e);
       }
     }

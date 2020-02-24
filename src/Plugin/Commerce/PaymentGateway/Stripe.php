@@ -164,7 +164,7 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
             $form_state->setError($form['secret_key'], $this->t('The provided secret key is not for the selected mode (@mode).', ['@mode' => $values['mode']]));
           }
         }
-        catch (\Stripe\Error\Base $e) {
+        catch (\Stripe\Exception\ApiErrorException $e) {
           $form_state->setError($form['secret_key'], $this->t('Invalid secret key.'));
         }
       }
@@ -233,7 +233,7 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
 
       // Update the transaction data from additional information added through
       // the event.
-      $metadata = $intent->metadata->__toArray();
+      $metadata = $intent->metadata->toArray();
       $metadata += $event->getMetadata();
 
       \Stripe\PaymentIntent::update($intent->id, [
@@ -243,7 +243,7 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
       $order->unsetData('stripe_intent');
       $order->save();
     }
-    catch (\Stripe\Error\Base $e) {
+    catch (\Stripe\Exception\ApiErrorException $e) {
       ErrorHelper::handleException($e);
     }
   }
@@ -276,7 +276,7 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
         $charge->capture($transaction_data);
       }
     }
-    catch (\Stripe\Error\Base $e) {
+    catch (\Stripe\Exception\ApiErrorException $e) {
       ErrorHelper::handleException($e);
     }
 
@@ -318,7 +318,7 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
         ErrorHelper::handleErrors($release_refund);
       }
     }
-    catch (\Stripe\Error\Base $e) {
+    catch (\Stripe\Exception\ApiErrorException $e) {
       ErrorHelper::handleException($e);
     }
 
@@ -345,7 +345,7 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
       $refund = \Stripe\Refund::create($data, ['idempotency_key' => \Drupal::getContainer()->get('uuid')->generate()]);
       ErrorHelper::handleErrors($refund);
     }
-    catch (\Stripe\Error\Base $e) {
+    catch (\Stripe\Exception\ApiErrorException $e) {
       ErrorHelper::handleException($e);
     }
 
@@ -400,7 +400,7 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
         $remote_payment_method->detach();
       }
     }
-    catch (\Stripe\Error\Base $e) {
+    catch (\Stripe\Exception\ApiErrorException $e) {
       ErrorHelper::handleException($e);
     }
     $payment_method->delete();
@@ -437,7 +437,7 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
       $intent = \Stripe\PaymentIntent::create($intent_array);
       $order->setData('stripe_intent', $intent->id)->save();
     }
-    catch (\Stripe\Error\Base $e) {
+    catch (\Stripe\Exception\ApiErrorException $e) {
       ErrorHelper::handleException($e);
     }
     return $intent;
@@ -509,7 +509,7 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
         \Stripe\PaymentMethod::update($stripe_payment_method_id, ['billing_details' => $payment_method_data]);
       }
     }
-    catch (\Stripe\Error\Base $e) {
+    catch (\Stripe\Exception\ApiErrorException $e) {
       ErrorHelper::handleException($e);
     }
     return $stripe_payment_method->card;

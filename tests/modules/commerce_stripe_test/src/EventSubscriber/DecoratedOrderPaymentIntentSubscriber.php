@@ -2,9 +2,8 @@
 
 namespace Drupal\commerce_stripe_test\EventSubscriber;
 
-use Drupal\commerce_order\Event\OrderEvent;
 use Drupal\commerce_stripe\EventSubscriber\OrderPaymentIntentSubscriber;
-use Stripe\Error\Base as StripeError;
+use Stripe\Exception\ApiErrorException as StripeError;
 use Stripe\PaymentIntent;
 
 class DecoratedOrderPaymentIntentSubscriber extends OrderPaymentIntentSubscriber {

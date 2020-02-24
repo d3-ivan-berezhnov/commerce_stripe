@@ -16,14 +16,14 @@ class ErrorHelper {
   /**
    * Translates Stripe exceptions into Commerce exceptions.
    *
-   * @param \Stripe\Error\Base $exception
+   * @param \Stripe\Exception\ApiErrorException $exception
    *   The Stripe exception.
    *
    * @throws \Drupal\commerce_payment\Exception\PaymentGatewayException
    *   The Commerce exception.
    */
-  public static function handleException(\Stripe\Error\Base $exception) {
-    if ($exception instanceof \Stripe\Error\Card) {
+  public static function handleException(\Stripe\Exception\ApiErrorException $exception) {
+    if ($exception instanceof \Stripe\Exception\CardException) {
       \Drupal::logger('commerce_stripe')->warning($exception->getMessage());
       if ($exception->getStripeCode() == 'card_declined' && $exception->getDeclineCode() == 'card_not_supported') {
         // Stripe only supports Visa/MasterCard/Amex for non-USD transactions.
@@ -36,23 +36,23 @@ class ErrorHelper {
         throw new DeclineException('We encountered an error processing your card details. Please verify your details and try again.');
       }
     }
-    elseif ($exception instanceof \Stripe\Error\RateLimit) {
+    elseif ($exception instanceof \Stripe\Exception\RateLimitException) {
       \Drupal::logger('commerce_stripe')->warning($exception->getMessage());
       throw new InvalidRequestException('Too many requests.');
     }
-    elseif ($exception instanceof \Stripe\Error\InvalidRequest) {
+    elseif ($exception instanceof \Stripe\Exception\InvalidRequestException) {
       \Drupal::logger('commerce_stripe')->warning($exception->getMessage());
       throw new InvalidRequestException('Invalid parameters were supplied to Stripe\'s API.');
     }
-    elseif ($exception instanceof \Stripe\Error\Authentication) {
+    elseif ($exception instanceof \Stripe\Exception\AuthenticationException) {
       \Drupal::logger('commerce_stripe')->warning($exception->getMessage());
       throw new AuthenticationException('Stripe authentication failed.');
     }
-    elseif ($exception instanceof \Stripe\Error\ApiConnection) {
+    elseif ($exception instanceof \Stripe\Exception\ApiConnectionException) {
       \Drupal::logger('commerce_stripe')->warning($exception->getMessage());
       throw new InvalidResponseException('Network communication with Stripe failed.');
     }
-    elseif ($exception instanceof \Stripe\Error\Base) {
+    elseif ($exception instanceof \Stripe\Exception\ApiErrorException) {
       \Drupal::logger('commerce_stripe')->warning($exception->getMessage());
       throw new InvalidResponseException('There was an error with Stripe request.');
     }
@@ -75,7 +75,7 @@ class ErrorHelper {
    *   The Commerce exception.
    */
   public static function handleErrors($result) {
-    $result_data = $result->__toArray();
+    $result_data = $result->toArray();
     if ($result_data['status'] == 'succeeded') {
       return;
     }
