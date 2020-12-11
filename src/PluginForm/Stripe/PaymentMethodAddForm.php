@@ -3,7 +3,9 @@
 namespace Drupal\commerce_stripe\PluginForm\Stripe;
 
 use Drupal\commerce_payment\PluginForm\PaymentMethodAddForm as BasePaymentMethodAddForm;
+use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\user\UserInterface;
 
 class PaymentMethodAddForm extends BasePaymentMethodAddForm {
 
@@ -17,17 +19,39 @@ class PaymentMethodAddForm extends BasePaymentMethodAddForm {
     // Set our key to settings array.
     /** @var \Drupal\commerce_stripe\Plugin\Commerce\PaymentGateway\StripeInterface $plugin */
     $plugin = $this->plugin;
+
+    /** @var \Drupal\commerce_payment\Entity\PaymentMethodInterface $payment_method */
+    $payment_method = $this->entity;
+    $payment_method_owner = $payment_method->getOwner();
+    // @todo Replace with setting check from https://www.drupal.org/project/commerce/issues/2871483.
+    // @todo Simplify check after https://www.drupal.org/project/commerce/issues/3073942.
+    $client_secret = NULL;
+    if ($payment_method_owner instanceof UserInterface && $payment_method_owner->isAuthenticated()) {
+      $route_match = \Drupal::routeMatch();
+      // @todo Use context passed by parent element after https://www.drupal.org/project/commerce/issues/3077783.
+      if ($route_match->getRouteName() === 'entity.commerce_payment_method.add_form') {
+        // A SetupIntent is required if this is being created for off-session
+        // usage (for instance, outside of checkout where there is no payment
+        // intent that will be authenticated.)
+        $setup_intent = \Stripe\SetupIntent::create([
+          'usage' => 'off_session',
+        ]);
+        $client_secret = $setup_intent->client_secret;
+      }
+    }
+
     $element['#attached']['library'][] = 'commerce_stripe/form';
     $element['#attached']['drupalSettings']['commerceStripe'] = [
       'publishableKey' => $plugin->getPublishableKey(),
+      'clientSecret' => $client_secret,
     ];
 
     // Populated by the JS library.
-    $element['stripe_token'] = [
+    $element['stripe_payment_method_id'] = [
       '#type' => 'hidden',
       '#attributes' => [
-        'id' => 'stripe_token'
-      ]
+        'id' => 'stripe-payment-method-id',
+      ],
     ];
 
     $element['card_number'] = [
@@ -61,6 +85,10 @@ class PaymentMethodAddForm extends BasePaymentMethodAddForm {
       '#weight' => -200,
     ];
 
+    $cacheability = new CacheableMetadata();
+    $cacheability->addCacheableDependency($this->entity);
+    $cacheability->setCacheMaxAge(0);
+    $cacheability->applyTo($element);
     return $element;
   }
 
@@ -75,7 +103,10 @@ class PaymentMethodAddForm extends BasePaymentMethodAddForm {
    * {@inheritdoc}
    */
   public function submitCreditCardForm(array $element, FormStateInterface $form_state) {
-    // The payment gateway plugin will process the submitted payment details.
+    if ($email = $form_state->getValue(['contact_information', 'email'])) {
+      $email_parents = array_merge($element['#parents'], ['email']);
+      $form_state->setValue($email_parents, $email);
+    }
   }
 
   /**
@@ -102,7 +133,7 @@ class PaymentMethodAddForm extends BasePaymentMethodAddForm {
    * @return array
    *   The modified form element.
    */
-  public static function addAddressAttributes($element, FormStateInterface $form_state) {
+  public static function addAddressAttributes(array $element, FormStateInterface $form_state) {
     $element['address']['widget'][0]['address']['given_name']['#attributes']['data-stripe'] = 'given_name';
     $element['address']['widget'][0]['address']['family_name']['#attributes']['data-stripe'] = 'family_name';
     $element['address']['widget'][0]['address']['address_line1']['#attributes']['data-stripe'] = 'address_line1';
@@ -127,7 +158,7 @@ class PaymentMethodAddForm extends BasePaymentMethodAddForm {
    * @return array
    *   The modified form element.
    */
-  public static function addCountryCodeAttributes($element) {
+  public static function addCountryCodeAttributes(array $element) {
     $element['country_code']['#attributes']['data-stripe'] = 'address_country';
     return $element;
   }

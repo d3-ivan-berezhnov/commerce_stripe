@@ -51,6 +51,8 @@ class TransactionDataEvent extends Event {
    *
    * @return array
    *   The transaction data.
+   *
+   * @deprecated Transaction data is no longer influenced by this event.
    */
   public function getTransactionData() {
     return $this->transactionData;
@@ -63,6 +65,8 @@ class TransactionDataEvent extends Event {
    *   The transaction data.
    *
    * @return $this
+   *
+   * @deprecated Transaction data is no longer influenced by this event.
    */
   public function setTransactionData(array $transaction_data) {
     $this->transactionData = $transaction_data;

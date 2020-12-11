@@ -2,11 +2,15 @@
 
 namespace Drupal\commerce_stripe\Plugin\Commerce\PaymentGateway;
 
+use Drupal\commerce_order\Entity\OrderInterface;
+use Drupal\commerce_payment\Exception\InvalidRequestException;
+use Drupal\commerce_payment\Exception\SoftDeclineException;
 use Drupal\commerce_stripe\ErrorHelper;
 use Drupal\commerce_payment\CreditCard;
 use Drupal\commerce_payment\Entity\PaymentInterface;
 use Drupal\commerce_payment\Entity\PaymentMethodInterface;
 use Drupal\commerce_payment\Exception\HardDeclineException;
+use Drupal\commerce_payment\Exception\PaymentGatewayException;
 use Drupal\commerce_payment\PaymentMethodTypeManager;
 use Drupal\commerce_payment\PaymentTypeManager;
 use Drupal\commerce_payment\Plugin\Commerce\PaymentGateway\OnsitePaymentGatewayBase;
@@ -17,6 +21,7 @@ use Drupal\Component\Datetime\TimeInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Site\Settings;
+use Stripe\PaymentIntent;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 
@@ -83,6 +88,10 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
    * Initializes the SDK.
    */
   protected function init() {
+    $info = system_get_info('module', 'commerce_stripe')['version'];
+    $version = !empty($info['version']) ? $info['version'] : '8.x-1.0-dev';
+    \Stripe\Stripe::setAppInfo('Centarro Commerce for Drupal', $version, 'https://www.drupal.org/project/commerce_stripe');
+
     // If Drupal is configured to use a proxy for outgoing requests, make sure
     // that the proxy CURLOPT_PROXY setting is passed to the Stripe SDK client.
     $http_client_config = Settings::get('http_client_config');
@@ -106,9 +115,9 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
    */
   public function defaultConfiguration() {
     return [
-      'publishable_key' => '',
-      'secret_key' => '',
-    ] + parent::defaultConfiguration();
+        'publishable_key' => '',
+        'secret_key' => '',
+      ] + parent::defaultConfiguration();
   }
 
   /**
@@ -177,47 +186,59 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
   public function createPayment(PaymentInterface $payment, $capture = TRUE) {
     $this->assertPaymentState($payment, ['new']);
     $payment_method = $payment->getPaymentMethod();
+    assert($payment_method instanceof PaymentMethodInterface);
     $this->assertPaymentMethod($payment_method);
-
-    $amount = $payment->getAmount();
-    $transaction_data = [
-      'currency' => $amount->getCurrencyCode(),
-      'amount' => $this->toMinorUnits($amount),
-      'source' => $payment_method->getRemoteId(),
-      'capture' => $capture,
-      'metadata' => [
-        'order_id' => $payment->getOrderId(),
-        'store_id' => $payment->getOrder()->getStoreId(),
-      ],
-    ];
-
-    // Add metadata and extra transaction data where required.
-    $event = new TransactionDataEvent($payment);
-    $this->eventDispatcher->dispatch(StripeEvents::TRANSACTION_DATA, $event);
-
-    // Update the transaction data from additional information added through
-    // the event.
-    $transaction_data += $event->getTransactionData();
-    $transaction_data['metadata'] += $event->getMetadata();
-
-    $owner = $payment_method->getOwner();
-    if ($owner && $owner->isAuthenticated()) {
-      $transaction_data['customer'] = $this->getRemoteCustomerId($owner);
-    }
-
+    $order = $payment->getOrder();
+    assert($order instanceof OrderInterface);
+    $intent_id = $order->getData('stripe_intent');
     try {
-      $result = \Stripe\Charge::create($transaction_data);
-      ErrorHelper::handleErrors($result);
+      $intent = \Stripe\PaymentIntent::retrieve($intent_id);
+      if ($intent->status === PaymentIntent::STATUS_REQUIRES_CONFIRMATION) {
+        $intent = $intent->confirm();
+      }
+      if ($intent->status === PaymentIntent::STATUS_REQUIRES_ACTION) {
+        throw new SoftDeclineException('The payment intent requires action by the customer for authentication');
+      }
+      if (!in_array($intent->status, [PaymentIntent::STATUS_REQUIRES_CAPTURE, PaymentIntent::STATUS_SUCCEEDED], TRUE)) {
+        $order->set('payment_method', NULL);
+        $this->deletePaymentMethod($payment_method);
+        if ($intent->status === PaymentIntent::STATUS_CANCELED) {
+          $order->setData('stripe_intent', NULL);
+        }
+
+        if (is_object($intent->last_payment_error)) {
+          $error = $intent->last_payment_error;
+          $decline_message = sprintf('%s: %s', $error->type, isset($error->message) ? $error->message : '');
+        }
+        else {
+          $decline_message = $intent->last_payment_error;
+        }
+        throw new HardDeclineException($decline_message);
+      }
+      if (count($intent->charges->data) === 0) {
+        throw new HardDeclineException(sprintf('The payment intent %s did not have a charge object.', $intent_id));
+      }
+      $next_state = $capture ? 'completed' : 'authorization';
+      $payment->setState($next_state);
+      $payment->setRemoteId($intent->charges->data[0]->id);
+      $payment->save();
+
+      // Add metadata and extra transaction data where required.
+      $event = new TransactionDataEvent($payment);
+      $this->eventDispatcher->dispatch(StripeEvents::TRANSACTION_DATA, $event);
+
+      // Update the transaction data from additional information added through
+      // the event.
+      $metadata = $intent->metadata->__toArray();
+      $metadata += $event->getMetadata();
+
+      \Stripe\PaymentIntent::update($intent->id, [
+        'metadata' => $metadata,
+      ]);
     }
     catch (\Stripe\Error\Base $e) {
       ErrorHelper::handleException($e);
     }
-
-    $next_state = $capture ? 'completed' : 'authorization';
-    $payment->setState($next_state);
-    $payment->setRemoteId($result['id']);
-    // @todo Find out how long an authorization is valid, set its expiration.
-    $payment->save();
   }
 
   /**
@@ -231,11 +252,22 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
     try {
       $remote_id = $payment->getRemoteId();
       $charge = \Stripe\Charge::retrieve($remote_id);
-      $charge->amount = $this->toMinorUnits($amount);
-      $transaction_data = [
-        'amount' => $charge->amount,
-      ];
-      $charge->capture($transaction_data);
+      $intent_id = $charge->payment_intent;
+      $amount_to_capture = $this->toMinorUnits($amount);
+      if (!empty($intent_id)) {
+        $intent = \Stripe\PaymentIntent::retrieve($intent_id);
+        if ($intent->status != 'requires_capture') {
+          throw new PaymentGatewayException('Only requires_capture PaymentIntents can be captured.');
+        }
+        $intent->capture(['amount_to_capture' => $amount_to_capture]);
+      }
+      else {
+        $charge->amount = $amount_to_capture;
+        $transaction_data = [
+          'amount' => $charge->amount,
+        ];
+        $charge->capture($transaction_data);
+      }
     }
     catch (\Stripe\Error\Base $e) {
       ErrorHelper::handleException($e);
@@ -251,17 +283,33 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
    */
   public function voidPayment(PaymentInterface $payment) {
     $this->assertPaymentState($payment, ['authorization']);
-
     // Void Stripe payment - release uncaptured payment.
     try {
       $remote_id = $payment->getRemoteId();
-      $amount = $payment->getAmount();
-      $data = [
-        'charge' => $remote_id,
-        'amount' => $this->toMinorUnits($amount),
-      ];
-      $release_refund = \Stripe\Refund::create($data);
-      ErrorHelper::handleErrors($release_refund);
+      $charge = \Stripe\Charge::retrieve($remote_id);
+      $intent_id = $charge->payment_intent;
+
+      if (!empty($intent_id)) {
+        $intent = \Stripe\PaymentIntent::retrieve($intent_id);
+        $statuses_to_void = [
+          'requires_payment_method',
+          'requires_capture',
+          'requires_confirmation',
+          'requires_action',
+        ];
+        if (!in_array($intent->status, $statuses_to_void)) {
+          throw new PaymentGatewayException('The PaymentIntent cannot be voided.');
+        }
+        $intent->cancel();
+      }
+      else {
+        $data = [
+          'charge' => $remote_id,
+        ];
+        // Voiding an authorized payment is done by creating a refund.
+        $release_refund = \Stripe\Refund::create($data);
+        ErrorHelper::handleErrors($release_refund);
+      }
     }
     catch (\Stripe\Error\Base $e) {
       ErrorHelper::handleException($e);
@@ -282,11 +330,12 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
 
     try {
       $remote_id = $payment->getRemoteId();
+      $minor_units_amount = $this->toMinorUnits($amount);
       $data = [
         'charge' => $remote_id,
-        'amount' => $this->toMinorUnits($amount),
+        'amount' => $minor_units_amount,
       ];
-      $refund = \Stripe\Refund::create($data);
+      $refund = \Stripe\Refund::create($data, ['idempotency_key' => \Drupal::getContainer()->get('uuid')->generate()]);
       ErrorHelper::handleErrors($refund);
     }
     catch (\Stripe\Error\Base $e) {
@@ -313,11 +362,11 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
     $required_keys = [
       // The expected keys are payment gateway specific and usually match
       // the PaymentMethodAddForm form elements. They are expected to be valid.
-      'stripe_token',
+      'stripe_payment_method_id',
     ];
     foreach ($required_keys as $required_key) {
       if (empty($payment_details[$required_key])) {
-        throw new \InvalidArgumentException(sprintf('$payment_details must contain the %s key.', $required_key));
+        throw new InvalidRequestException(sprintf('$payment_details must contain the %s key.', $required_key));
       }
     }
 
@@ -326,9 +375,8 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
     $payment_method->card_number = $remote_payment_method['last4'];
     $payment_method->card_exp_month = $remote_payment_method['exp_month'];
     $payment_method->card_exp_year = $remote_payment_method['exp_year'];
-    $remote_id = $remote_payment_method['id'];
     $expires = CreditCard::calculateExpirationTimestamp($remote_payment_method['exp_month'], $remote_payment_method['exp_year']);
-    $payment_method->setRemoteId($remote_id);
+    $payment_method->setRemoteId($payment_details['stripe_payment_method_id']);
     $payment_method->setExpiresTime($expires);
     $payment_method->save();
   }
@@ -338,19 +386,54 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
    */
   public function deletePaymentMethod(PaymentMethodInterface $payment_method) {
     // Delete the remote record.
+    $payment_method_remote_id = $payment_method->getRemoteId();
     try {
-      $owner = $payment_method->getOwner();
-      if ($owner) {
-        $customer_id = $this->getRemoteCustomerId($owner);
-        $customer = \Stripe\Customer::retrieve($customer_id);
-        $customer->sources->retrieve($payment_method->getRemoteId())->delete();
+      $remote_payment_method = \Stripe\PaymentMethod::retrieve($payment_method_remote_id);
+      if ($remote_payment_method->customer) {
+        $remote_payment_method->detach();
       }
     }
     catch (\Stripe\Error\Base $e) {
       ErrorHelper::handleException($e);
     }
-    // Delete the local entity.
     $payment_method->delete();
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function createPaymentIntent(OrderInterface $order, $capture = TRUE) {
+    /** @var \Drupal\commerce_payment\Entity\PaymentMethodInterface $payment_method */
+    $payment_method = $order->get('payment_method')->entity;
+
+    $payment_method_remote_id = $payment_method->getRemoteId();
+    $customer_remote_id = $this->getRemoteCustomerId($order->getCustomer());
+
+    $amount = $this->toMinorUnits($order->getTotalPrice());
+    $order_id = $order->id();
+    $capture_method = $capture ? 'automatic' : 'manual';
+    $intent_array = [
+      'amount' => $amount,
+      'currency' => strtolower($order->getTotalPrice()->getCurrencyCode()),
+      'payment_method_types' => ['card'],
+      'metadata' => [
+        'order_id' => $order_id,
+        'store_id' => $order->getStoreId(),
+      ],
+      'payment_method' => $payment_method_remote_id,
+      'capture_method' => $capture_method,
+    ];
+    if (!empty($customer_remote_id)) {
+      $intent_array['customer'] = $customer_remote_id;
+    }
+    try {
+      $intent = \Stripe\PaymentIntent::create($intent_array);
+      $order->setData('stripe_intent', $intent->id)->save();
+    }
+    catch (\Stripe\Error\Base $e) {
+      ErrorHelper::handleException($e);
+    }
+    return $intent;
   }
 
   /**
@@ -371,54 +454,57 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
    *   - expiration_year: The expiration year.
    */
   protected function doCreatePaymentMethod(PaymentMethodInterface $payment_method, array $payment_details) {
+    $stripe_payment_method_id = $payment_details['stripe_payment_method_id'];
     $owner = $payment_method->getOwner();
     $customer_id = NULL;
-    $customer_data = [];
     if ($owner && $owner->isAuthenticated()) {
       $customer_id = $this->getRemoteCustomerId($owner);
-      $customer_data['email'] = $owner->getEmail();
     }
-
-    if ($customer_id) {
-      // If the customer id already exists, use the Stripe form token to create the new card.
-      $customer = \Stripe\Customer::retrieve($customer_id);
-      // Create a payment method for an existing customer.
-      try {
-        $card = $customer->sources->create(['source' => $payment_details['stripe_token']]);
-        return $card;
+    try {
+      $stripe_payment_method = \Stripe\PaymentMethod::retrieve($stripe_payment_method_id);
+      if ($customer_id) {
+        $stripe_payment_method->attach(['customer' => $customer_id]);
+        $email = $owner->getEmail();
       }
-      catch (\Stripe\Error\Base $e) {
-        ErrorHelper::handleException($e);
-      }
-    }
-    elseif ($owner && $owner->isAuthenticated()) {
-      // Create both the customer and the payment method.
-      try {
+      // If the user is authenticated, created a Stripe customer to attach the
+      // payment method to.
+      elseif ($owner && $owner->isAuthenticated()) {
+        $email = $owner->getEmail();
         $customer = \Stripe\Customer::create([
-          'email' => $owner->getEmail(),
-          'description' => $this->t('Customer for :mail', [':mail' => $owner->getEmail()]),
-          'source' => $payment_details['stripe_token'],
+          'email' => $email,
+          'description' => $this->t('Customer for :mail', [':mail' => $email]),
+          'payment_method' => $stripe_payment_method_id,
         ]);
-        $cards = \Stripe\Customer::retrieve($customer->id)->sources->all(['object' => 'card']);
-        $cards_array = \Stripe\Util\Util::convertStripeObjectToArray([$cards]);
-        $this->setRemoteCustomerId($owner, $customer->id);
+        $customer_id = $customer->id;
+        $this->setRemoteCustomerId($owner, $customer_id);
         $owner->save();
-        foreach ($cards_array[0]['data'] as $card) {
-          return $card;
-        }
       }
-      catch (\Stripe\Error\Base $e) {
-        ErrorHelper::handleException($e);
+      else {
+        $email = NULL;
       }
-    }
-    else {
-      $card_token = \Stripe\Token::retrieve($payment_details['stripe_token']);
-      // We need to use token for Anonymous customers.
-      $card_token->card['id'] = $payment_details['stripe_token'];
-      return $card_token->card;
-    }
 
-    return [];
+      if ($customer_id && $email) {
+        $billing_address = $payment_method->getBillingProfile()->get('address')->first()->toArray();
+        \Stripe\PaymentMethod::update($stripe_payment_method_id, [
+          'billing_details' => [
+            'address' => [
+              'city' => $billing_address['locality'],
+              'country' => $billing_address['country_code'],
+              'line1' => $billing_address['address_line1'],
+              'line2' => $billing_address['address_line2'],
+              'postal_code' => $billing_address['postal_code'],
+              'state' => $billing_address['administrative_area'],
+            ],
+            'email' => $email,
+            'name' => $billing_address['given_name'] . ' ' . $billing_address['family_name'],
+          ],
+        ]);
+      }
+    }
+    catch (\Stripe\Error\Base $e) {
+      ErrorHelper::handleException($e);
+    }
+    return $stripe_payment_method->card;
   }
 
   /**
@@ -431,14 +517,13 @@ class Stripe extends OnsitePaymentGatewayBase implements StripeInterface {
    *   The Commerce credit card type.
    */
   protected function mapCreditCardType($card_type) {
-    // https://support.stripe.com/questions/which-cards-and-payment-types-can-i-accept-with-stripe.
     $map = [
-      'American Express' => 'amex',
-      'Diners Club' => 'dinersclub',
-      'Discover' => 'discover',
-      'JCB' => 'jcb',
-      'MasterCard' => 'mastercard',
-      'Visa' => 'visa',
+      'amex' => 'amex',
+      'diners' => 'dinersclub',
+      'discover' => 'discover',
+      'jcb' => 'jcb',
+      'mastercard' => 'mastercard',
+      'visa' => 'visa',
     ];
     if (!isset($map[$card_type])) {
       throw new HardDeclineException(sprintf('Unsupported credit card type "%s".', $card_type));
