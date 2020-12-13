@@ -143,10 +143,11 @@ class StripeReview extends CheckoutPaneBase {
       'orderId' => $this->order->id(),
       'paymentMethod' => $intent->payment_method,
     ];
-    $profiles = $this->order->collectProfiles();
-    if (isset($profiles['shipping'])) {
-      $pane_form['#attached']['drupalSettings']['commerceStripe']['shipping'] = $profiles['shipping']->get('address')->first()->toArray();
-    }
+    // TODO: Uncomment for commerce 2.15.
+    // $profiles = $this->order->collectProfiles();
+    // if (isset($profiles['shipping'])) {
+    //   $pane_form['#attached']['drupalSettings']['commerceStripe']['shipping'] = $profiles['shipping']->get('address')->first()->toArray();
+    // }
 
     $cacheability = new CacheableMetadata();
     $cacheability->addCacheableDependency($this->order);
