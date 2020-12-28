@@ -5,6 +5,6 @@
     "homepage": "http://drupal.org/project/commerce_stripe",
     "require": {
         "drupal/commerce": "~2.0",
-        "stripe/stripe-php": "~5.0"
+        "stripe/stripe-php": "~7.66.1"
     }
 }
